@@ -1,0 +1,79 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        tls:
+          cert_file: /server-certs/server.crt
+          key_file: /server-certs/server.key
+          client_ca_file: /certs/ca.crt
+      http:
+        endpoint: 0.0.0.0:4318
+        tls:
+          cert_file: /server-certs/server.crt
+          key_file: /server-certs/server.key
+          client_ca_file: /certs/ca.crt
+  azuremonitor:
+    subscription_ids:
+      - ${env:AZURE_SUBSCRIPTION_ID}
+    auth:
+      authenticator: azureauth
+    resource_groups:
+      - ${env:AZURE_RESOURCE_GROUP}
+    services:
+      - Microsoft.ContainerService/managedClusters
+    collection_interval: 60s
+  azureeventhub:
+    connection: ${env:AZURE_EVENTHUB_CONNECTION_STRING}
+    group: ${env:AZURE_EVENTHUB_CONSUMER_GROUP}
+    format: raw
+    #format: azure
+    storage: file_storage
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 75
+    spike_limit_percentage: 15
+  batch:
+    send_batch_size: 2048
+  transform/eventhub_json:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - set(body, Decode(body, "utf-8"))
+          - set(body, ParseJSON(body))
+
+exporters:
+  debug:
+    verbosity: detailed
+    #verbosity: basic
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+  file_storage:
+    directory: ${env:AZURE_EVENTHUB_STORAGE_DIRECTORY}
+    create_directory: true
+  azureauth:
+    service_principal:
+      tenant_id: ${env:AZURE_TENANT_ID}
+      client_id: ${env:AZURE_CLIENT_ID}
+      client_secret: ${env:AZURE_CLIENT_SECRET}
+
+service:
+  extensions: [health_check, azureauth, file_storage]
+  pipelines:
+    logs:
+      receivers: [ otlp ]
+      processors: [ memory_limiter, batch ]
+      exporters: [ debug ]
+    logs/eventhub:
+      receivers: [ azureeventhub ]
+      processors: [ memory_limiter, transform/eventhub_json, batch ]
+      exporters: [ debug ]
+    metrics:
+      receivers: [azuremonitor]
+      processors: [memory_limiter, batch]
+      exporters: [debug]

@@ -1,0 +1,108 @@
+services:
+  adapter:
+    build: .
+    environment:
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID:?Set AZURE_TENANT_ID in .env}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:?Set AZURE_CLIENT_ID in .env}
+      AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET:?Set AZURE_CLIENT_SECRET in .env}
+    group_add:
+      - "${CERT_GID:?Set CERT_GID in .env}"
+    volumes:
+      - adapter-buffer:/app/data
+      - type: bind
+        source: ./logs
+        target: /app/logs
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./config.yaml
+        target: /app/config.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /etc/localtime
+        target: /etc/localtime
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./certs/ca/ca.crt
+        target: /app/certs/ca/ca.crt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./certs/client/client.crt
+        target: /app/certs/client/client.crt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./certs/client/client.key
+        target: /app/certs/client/client.key
+        read_only: true
+        bind:
+          create_host_path: false
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      - otel-collector
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.135.0
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    user: "1000:1000"
+    environment:
+      AZURE_TENANT_ID: ${AZURE_TENANT_ID:?Set AZURE_TENANT_ID in .env}
+      AZURE_CLIENT_ID: ${AZURE_CLIENT_ID:?Set AZURE_CLIENT_ID in .env}
+      AZURE_CLIENT_SECRET: ${AZURE_CLIENT_SECRET:?Set AZURE_CLIENT_SECRET in .env}
+      AZURE_SUBSCRIPTION_ID: ${AZURE_SUBSCRIPTION_ID:?Set AZURE_SUBSCRIPTION_ID in .env}
+      AZURE_RESOURCE_GROUP: ${AZURE_RESOURCE_GROUP:?Set AZURE_RESOURCE_GROUP in .env}
+      AZURE_EVENTHUB_CONNECTION_STRING: ${AZURE_EVENTHUB_CONNECTION_STRING:?Set AZURE_EVENTHUB_CONNECTION_STRING in .env}
+      AZURE_EVENTHUB_CONSUMER_GROUP: ${AZURE_EVENTHUB_CONSUMER_GROUP:?Set AZURE_EVENTHUB_CONSUMER_GROUP in .env}
+      AZURE_EVENTHUB_STORAGE_DIRECTORY: ${AZURE_EVENTHUB_STORAGE_DIRECTORY:-/var/lib/otelcol/storage-v2}
+    group_add:
+      - "${CERT_GID:?Set CERT_GID in .env}"
+    volumes:
+      - type: bind
+        source: ./otel-collector.yaml
+        target: /etc/otelcol-contrib/config.yaml
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./certs/ca/ca.crt
+        target: /certs/ca.crt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./certs/server/server.crt
+        target: /server-certs/server.crt
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./certs/server/server.key
+        target: /server-certs/server.key
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./data/otel-collector-checkpoints
+        target: /var/lib/otelcol
+        bind:
+          create_host_path: false
+    expose:
+      - "4317"
+      - "4318"
+      - "13133"
+    restart: unless-stopped
+
+volumes:
+  adapter-buffer:

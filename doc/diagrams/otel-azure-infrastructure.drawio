@@ -1,0 +1,90 @@
+<mxfile host="app.diagrams.net" agent="draw.io" version="32.4.1" type="device">
+  <diagram id="otel-azure-infrastructure" name="Azure OTEL Infrastructure">
+    <mxGraphModel dx="1400" dy="1500" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1500" background="#FFFFFF" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="OTEL Azure Infrastructure" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontFamily=Arial;fontSize=28;fontStyle=1;fontColor=#17365D;" vertex="1" parent="1">
+          <mxGeometry x="35" y="25" width="900" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="subscription" value="Azure subscription" data-model-id="subscription" style="swimlane;html=1;whiteSpace=wrap;startSize=45;horizontal=1;collapsible=0;container=1;recursiveResize=0;rounded=0;fillColor=#F1F5F9;swimlaneFillColor=#FFFFFF;strokeColor=#7AA7CF;strokeWidth=2;dashed=1;align=left;spacingLeft=20;fontFamily=Arial;fontSize=18;fontStyle=1;fontColor=#17365D;" vertex="1" parent="1">
+          <mxGeometry x="30" y="90" width="1340" height="1140" as="geometry"/>
+        </mxCell>
+        <mxCell id="resource-group" value="Resource group | otel-azure-dev-rg | westus2" data-model-id="resource-group" data-source="agentic-ai-dev/terraform/otel-azure/main.tf" style="swimlane;html=1;whiteSpace=wrap;startSize=50;horizontal=1;collapsible=0;container=1;recursiveResize=0;rounded=0;fillColor=#EDF5FC;swimlaneFillColor=#FFFFFF;strokeColor=#7AA7CF;strokeWidth=2;align=left;spacingLeft=20;fontFamily=Arial;fontSize=18;fontStyle=1;fontColor=#17365D;" vertex="1" parent="subscription">
+          <mxGeometry x="20" y="60" width="1300" height="1050" as="geometry"/>
+        </mxCell>
+        <mxCell id="vnet" value="Virtual network&#xa;otel-azure-dev-vnet" data-model-id="vnet" data-source="agentic-ai-dev/terraform/otel-azure/main.tf" style="swimlane;html=1;whiteSpace=wrap;startSize=65;horizontal=1;collapsible=0;container=1;recursiveResize=0;rounded=0;fillColor=#EDF5FC;swimlaneFillColor=#F7FAFD;strokeColor=#7AA7CF;strokeWidth=2;align=left;spacingLeft=20;fontFamily=Arial;fontSize=18;fontStyle=1;fontColor=#17365D;" vertex="1" parent="resource-group">
+          <mxGeometry x="375" y="80" width="550" height="450" as="geometry"/>
+        </mxCell>
+        <mxCell id="subnet" value="Subnet | aks" data-model-id="subnet" data-source="agentic-ai-dev/terraform/otel-azure/main.tf" style="swimlane;html=1;whiteSpace=wrap;startSize=45;horizontal=1;collapsible=0;container=1;recursiveResize=0;rounded=0;fillColor=#F1F5F9;swimlaneFillColor=#FFFFFF;strokeColor=#A6B7C8;dashed=1;align=left;spacingLeft=18;fontFamily=Arial;fontSize=17;fontColor=#365F83;" vertex="1" parent="vnet">
+          <mxGeometry x="25" y="90" width="500" height="335" as="geometry"/>
+        </mxCell>
+        <mxCell id="aks" value="AKS cluster&#xa;otel-azure-dev-aks" data-model-id="aks" data-source="agentic-ai-dev/terraform/otel-azure/modules/aks-control-plane/main.tf" style="swimlane;html=1;whiteSpace=wrap;startSize=75;horizontal=1;collapsible=0;container=1;recursiveResize=0;rounded=1;arcSize=12;fillColor=#D9ECFA;swimlaneFillColor=#EDF5FC;strokeColor=#0078D4;strokeWidth=2;align=center;fontFamily=Arial;fontSize=20;fontStyle=1;fontColor=#17365D;" vertex="1" parent="subnet">
+          <mxGeometry x="25" y="85" width="450" height="220" as="geometry"/>
+        </mxCell>
+        <mxCell id="system-pool" value="system&#xa;System node pool" data-model-id="system-pool" data-source="agentic-ai-dev/terraform/otel-azure/modules/aks-control-plane/variables.tf" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7AA7CF;strokeWidth=1.5;align=center;verticalAlign=middle;spacing=12;fontFamily=Arial;fontSize=17;fontColor=#17365D;" vertex="1" parent="aks">
+          <mxGeometry x="25" y="110" width="185" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="spot-pool" value="spot&#xa;Spot node pool" data-model-id="spot-pool" data-source="agentic-ai-dev/terraform/otel-azure/modules/aks-worker/main.tf" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7AA7CF;strokeWidth=1.5;align=center;verticalAlign=middle;spacing=12;fontFamily=Arial;fontSize=17;fontColor=#17365D;" vertex="1" parent="aks">
+          <mxGeometry x="240" y="110" width="185" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="acr" value="Azure Container Registry&#xa;otelazuredevacr[suffix]" data-model-id="acr" data-source="agentic-ai-dev/terraform/otel-azure/modules/container-registry/main.tf" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#EDF5FC;strokeColor=#0078D4;strokeWidth=2;align=center;verticalAlign=middle;spacing=14;fontFamily=Arial;fontSize=18;fontColor=#17365D;" vertex="1" parent="resource-group">
+          <mxGeometry x="30" y="310" width="290" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="azure-monitor" value="Azure Monitor&#xa;AKS metrics" data-model-id="azure-monitor" data-source="agentic-ai-dev/terraform/otel-azure/modules/aks-control-plane/main.tf" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#EDF5FC;strokeColor=#0078D4;strokeWidth=2;align=center;verticalAlign=middle;spacing=14;fontFamily=Arial;fontSize=18;fontColor=#17365D;" vertex="1" parent="resource-group">
+          <mxGeometry x="200" y="650" width="300" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="law" value="Log Analytics workspace&#xa;otel-azure-dev-law" data-model-id="law" data-source="agentic-ai-dev/terraform/otel-azure/modules/log-analytics/main.tf" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#EDF5FC;strokeColor=#0078D4;strokeWidth=2;align=center;verticalAlign=middle;spacing=14;fontFamily=Arial;fontSize=18;fontColor=#17365D;" vertex="1" parent="resource-group">
+          <mxGeometry x="800" y="650" width="300" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="event-hubs" value="Event Hubs namespace&#xa;otel-azure-dev-eh-[suffix]" data-model-id="event-hubs" data-source="agentic-ai-dev/terraform/otel-azure/modules/event-hub/main.tf" style="swimlane;html=1;whiteSpace=wrap;startSize=65;horizontal=1;collapsible=0;container=1;recursiveResize=0;rounded=1;arcSize=12;fillColor=#EDF5FC;swimlaneFillColor=#FFFFFF;strokeColor=#0078D4;strokeWidth=2;align=center;fontFamily=Arial;fontSize=18;fontColor=#17365D;" vertex="1" parent="resource-group">
+          <mxGeometry x="800" y="850" width="300" height="125" as="geometry"/>
+        </mxCell>
+        <mxCell id="event-hub" value="otel-azure-dev-aks-logs" data-model-id="event-hub" data-source="agentic-ai-dev/terraform/otel-azure/modules/event-hub/main.tf" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#7AA7CF;align=center;verticalAlign=middle;spacing=8;fontFamily=Arial;fontSize=17;fontColor=#17365D;" vertex="1" parent="event-hubs">
+          <mxGeometry x="15" y="75" width="270" height="35" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-acr-aks" value="Images" data-model-id="edge-acr-aks" data-source="agentic-ai-dev/terraform/otel-azure/modules/container-registry/main.tf" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#365F83;strokeWidth=2;endArrow=block;endFill=1;exitX=1;exitY=0.5;exitPerimeter=0;entryX=0;entryY=0.5;entryPerimeter=0;fontFamily=Arial;fontSize=16;fontColor=#365F83;labelBackgroundColor=#FFFFFF;" edge="1" parent="resource-group" source="acr" target="aks">
+          <mxGeometry x="-0.45" y="-18" relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-aks-monitor" value="Metrics" data-model-id="edge-aks-monitor" data-source="agentic-ai-dev/terraform/otel-azure/modules/aks-control-plane/main.tf" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#365F83;strokeWidth=2;endArrow=block;endFill=1;exitX=0.25;exitY=1;exitPerimeter=0;entryX=0.5;entryY=0;entryPerimeter=0;fontFamily=Arial;fontSize=16;fontColor=#365F83;labelBackgroundColor=#FFFFFF;" edge="1" parent="resource-group" source="aks" target="azure-monitor">
+          <mxGeometry x="0.2" y="18" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="537.5" y="580"/>
+              <mxPoint x="350" y="580"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-aks-law" value="Logs" data-model-id="edge-aks-law" data-source="agentic-ai-dev/terraform/otel-azure/modules/aks-control-plane/main.tf" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#365F83;strokeWidth=2;endArrow=block;endFill=1;exitX=0.75;exitY=1;exitPerimeter=0;entryX=0.5;entryY=0;entryPerimeter=0;fontFamily=Arial;fontSize=16;fontColor=#365F83;labelBackgroundColor=#FFFFFF;" edge="1" parent="resource-group" source="aks" target="law">
+          <mxGeometry x="0.2" y="-18" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="762.5" y="580"/>
+              <mxPoint x="950" y="580"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-law-eh" value="Export" data-model-id="edge-law-eh" data-source="agentic-ai-dev/terraform/otel-azure/modules/event-hub/main.tf" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#365F83;strokeWidth=2;endArrow=block;endFill=1;exitX=0.5;exitY=1;exitPerimeter=0;entryX=0.5;entryY=0;entryPerimeter=0;fontFamily=Arial;fontSize=16;fontColor=#365F83;labelBackgroundColor=#FFFFFF;" edge="1" parent="resource-group" source="law" target="event-hubs">
+          <mxGeometry x="0" y="-40" relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="collector" value="OTEL Collector&#xa;External" data-model-id="collector" style="rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#F1F5F9;strokeColor=#365F83;strokeWidth=2;align=center;verticalAlign=middle;spacing=14;fontFamily=Arial;fontSize=20;fontColor=#17365D;" vertex="1" parent="1">
+          <mxGeometry x="570" y="1330" width="260" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="edge-monitor-collector" value="Metrics" data-model-id="edge-monitor-collector" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#365F83;strokeWidth=2;endArrow=block;endFill=1;exitX=0.5;exitY=1;exitPerimeter=0;entryX=0.25;entryY=0;entryPerimeter=0;fontFamily=Arial;fontSize=16;fontColor=#365F83;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="azure-monitor" target="collector">
+          <mxGeometry x="-0.55" y="40" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="400" y="1280"/>
+              <mxPoint x="635" y="1280"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="edge-eh-collector" value="Logs" data-model-id="edge-eh-collector" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#365F83;strokeWidth=2;endArrow=block;endFill=1;exitX=0.5;exitY=1;exitPerimeter=0;entryX=0.75;entryY=0;entryPerimeter=0;fontFamily=Arial;fontSize=16;fontColor=#365F83;labelBackgroundColor=#FFFFFF;" edge="1" parent="1" source="event-hubs" target="collector">
+          <mxGeometry x="-0.85" y="-30" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1000" y="1280"/>
+              <mxPoint x="765" y="1280"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

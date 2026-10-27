@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aks-demo
+  labels:
+    app: aks-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aks-demo
+  template:
+    metadata:
+      labels:
+        app: aks-demo
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+        kubernetes.azure.com/scalesetpriority: spot
+      tolerations:
+        - key: kubernetes.azure.com/scalesetpriority
+          operator: Equal
+          value: spot
+          effect: NoSchedule
+      containers:
+        - name: nginx
+          image: <acr-login-server>/aks-demo:v1
+          ports:
+            - name: http
+              containerPort: 80
