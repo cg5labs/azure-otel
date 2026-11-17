@@ -1,0 +1,144 @@
+fullnameOverride: otel
+mode: daemonset
+
+image:
+  repository: otel/opentelemetry-collector-contrib
+  tag: 0.163.2
+
+command:
+  name: otelcol-contrib
+
+presets:
+  kubernetesAttributes:
+    enabled: true
+
+config:
+  exporters:
+    debug: null
+    otlp_http:
+      endpoint: ${env:OTEL_AGENT_OTLP_ENDPOINT}
+      # For static-token fallback only:
+      # headers:
+      #   Authorization: "Bearer ${env:OTEL_API_KEY}"
+      auth:
+        authenticator: azure_auth
+      tls:
+        ca_file: /etc/otel/certs/ca.crt
+        # Client-certificate authentication is disabled; use Azure Workload Identity.
+        # cert_file: /etc/otel/certs/client.crt
+        # key_file: /etc/otel/certs/client.key
+  extensions:
+    azure_auth:
+      workload_identity:
+        client_id: ${env:AZURE_CLIENT_ID}
+        federated_token_file: ${env:AZURE_FEDERATED_TOKEN_FILE}
+        tenant_id: ${env:AZURE_TENANT_ID}
+      scopes:
+        - ${env:OTEL_AGENT_OTLP_SCOPE}
+  receivers:
+    file_log:
+      include:
+        - /var/log/pods/*/*/*.log
+      exclude:
+        - /var/log/pods/otel-agent_otel-agent*_*/opentelemetry-collector/*.log
+      include_file_name: false
+      include_file_path: true
+      retry_on_failure:
+        enabled: true
+      start_at: end
+      operators:
+        - id: container-parser
+          type: container
+          add_metadata_from_filepath: true
+          max_log_size: 102400
+    jaeger: null
+    otlp: null
+    prometheus: null
+    zipkin: null
+  service:
+    extensions:
+      - health_check
+      - azure_auth
+    pipelines:
+      logs:
+        exporters:
+          - otlp_http
+        receivers:
+          - file_log
+      metrics: null
+      traces: null
+    telemetry:
+      metrics:
+        level: none
+        readers: []
+
+extraEnvs:
+  - name: OTEL_AGENT_OTLP_ENDPOINT
+    value: ""
+  - name: OTEL_AGENT_OTLP_SCOPE
+    value: ""
+
+extraVolumes:
+  - name: varlogpods
+    hostPath:
+      path: /var/log/pods
+      type: Directory
+  - name: otel-agent-mtls
+    secret:
+      secretName: otel-agent-mtls
+      defaultMode: 288
+      items:
+        - key: ca.crt
+          path: ca.crt
+
+extraVolumeMounts:
+  - name: varlogpods
+    mountPath: /var/log/pods
+    readOnly: true
+  - name: otel-agent-mtls
+    mountPath: /etc/otel/certs
+    readOnly: true
+
+podSecurityContext:
+  fsGroup: 10001
+
+ports:
+  otlp:
+    enabled: false
+  otlp-http:
+    enabled: false
+  jaeger-compact:
+    enabled: false
+  jaeger-thrift:
+    enabled: false
+  jaeger-grpc:
+    enabled: false
+  zipkin:
+    enabled: false
+  metrics:
+    enabled: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+nodeSelector:
+  kubernetes.azure.com/mode: user
+
+serviceAccount:
+  create: true
+  name: otel-agent
+  annotations: {}
+
+podLabels:
+  azure.workload.identity/use: "true"
+
+tolerations:
+  - key: kubernetes.azure.com/scalesetpriority
+    operator: Equal
+    value: spot
+    effect: NoSchedule

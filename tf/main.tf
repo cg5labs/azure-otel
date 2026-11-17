@@ -4,10 +4,13 @@ locals {
     managed_by  = "OpenTofu"
   })
 
-  aks_kubernetes_version  = var.kubernetes_version != null ? var.kubernetes_version : try(data.azurerm_kubernetes_service_versions.current[0].latest_version, null)
-  subscription_suffix     = substr(lower(replace(data.azurerm_client_config.current.subscription_id, "-", "")), 0, 8)
-  eventhub_namespace_name = "${var.eventhub_namespace_name_prefix}-${substr(lower(replace(data.azurerm_client_config.current.subscription_id, "-", "")), 0, 12)}"
-  container_registry_name = "${var.container_registry_name_prefix}${local.subscription_suffix}"
+  aks_kubernetes_version       = var.kubernetes_version != null ? var.kubernetes_version : try(data.azurerm_kubernetes_service_versions.current[0].latest_version, null)
+  subscription_suffix          = substr(lower(replace(data.azurerm_client_config.current.subscription_id, "-", "")), 0, 8)
+  eventhub_namespace_name      = "${var.eventhub_namespace_name_prefix}-${substr(lower(replace(data.azurerm_client_config.current.subscription_id, "-", "")), 0, 12)}"
+  container_registry_name      = "${var.container_registry_name_prefix}${local.subscription_suffix}"
+  otel_receiver_identifier_uri = "api://${data.azurerm_client_config.current.tenant_id}/${var.kubernetes_cluster_name}-otel-collector"
+  # Keep the application role ID stable so role assignments do not churn.
+  otel_receiver_write_role_id = "7e5d8a38-4e51-46d3-a129-c6d3ae05e237"
 }
 
 data "azurerm_client_config" "current" {}
@@ -109,6 +112,63 @@ module "aks_control_plane" {
   enable_azure_monitor_logs        = var.enable_azure_monitor_logs
   enable_defender                  = var.enable_defender
   tags                             = local.common_tags
+}
+
+resource "azurerm_user_assigned_identity" "otel_agent" {
+  count = var.enable_aks ? 1 : 0
+
+  name                = "${var.kubernetes_cluster_name}-otel-agent"
+  location            = azurerm_resource_group.this.location
+  resource_group_name = azurerm_resource_group.this.name
+  tags                = local.common_tags
+}
+
+resource "azurerm_federated_identity_credential" "otel_agent" {
+  count = var.enable_aks ? 1 : 0
+
+  name                      = "otel-agent"
+  user_assigned_identity_id = azurerm_user_assigned_identity.otel_agent[0].id
+  audience                  = ["api://AzureADTokenExchange"]
+  issuer                    = module.aks_control_plane[0].oidc_issuer_url
+  subject                   = "system:serviceaccount:otel-agent:otel-agent"
+}
+
+resource "azuread_application" "otel_receiver" {
+  count = var.enable_aks ? 1 : 0
+
+  display_name     = "${var.kubernetes_cluster_name}-otel-collector-api"
+  identifier_uris  = [local.otel_receiver_identifier_uri]
+  owners           = [data.azurerm_client_config.current.object_id]
+  sign_in_audience = "AzureADMyOrg"
+
+  api {
+    requested_access_token_version = 2
+  }
+
+  app_role {
+    allowed_member_types = ["Application"]
+    description          = "Allows the AKS OTEL agent to send telemetry."
+    display_name         = "Write telemetry"
+    enabled              = true
+    id                   = local.otel_receiver_write_role_id
+    value                = "Telemetry.Write"
+  }
+}
+
+resource "azuread_service_principal" "otel_receiver" {
+  count = var.enable_aks ? 1 : 0
+
+  client_id                    = azuread_application.otel_receiver[0].client_id
+  app_role_assignment_required = true
+  owners                       = [data.azurerm_client_config.current.object_id]
+}
+
+resource "azuread_app_role_assignment" "otel_agent" {
+  count = var.enable_aks ? 1 : 0
+
+  app_role_id         = local.otel_receiver_write_role_id
+  principal_object_id = azurerm_user_assigned_identity.otel_agent[0].principal_id
+  resource_object_id  = azuread_service_principal.otel_receiver[0].object_id
 }
 
 module "container_registry" {

@@ -370,7 +370,7 @@ variable "eventhub_message_retention_days" {
 }
 
 variable "eventhub_export_tables" {
-  description = "Supported AKS diagnostic and Container Insights tables exported continuously to Event Hubs."
+  description = "Existing AKS diagnostic and Container Insights tables exported continuously to Event Hubs."
   type        = set(string)
   default = [
     "AKSAudit",
@@ -381,8 +381,6 @@ variable "eventhub_export_tables" {
     "ContainerLog",
     "ContainerLogV2",
     "ContainerNodeInventory",
-    "ContainerNodeStatus",
-    "ContainerPodInventory",
     "ContainerServiceLog",
     "InsightsMetrics",
     "KubeEvents",

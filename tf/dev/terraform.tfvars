@@ -40,13 +40,13 @@ kubernetes_cluster_name         = "otel-azure-dev-aks"
 dns_prefix                      = "otel-azure-dev"
 kubernetes_version              = null
 aks_admin_group_object_ids      = []
-api_server_authorized_ip_ranges = ["116.89.33.134/32"]
+api_server_authorized_ip_ranges = ["116.89.33.0/24"]
 service_cidr                    = "10.0.0.0/16"
 dns_service_ip                  = "10.0.0.10"
 pod_cidr                        = "10.244.0.0/16"
 
 node_vm_size         = "Standard_D2s_v7"
-node_count           = 1
+node_count           = 2
 spot_node_pool_name  = "spot"
 spot_node_count      = 1
 spot_max_price       = -1

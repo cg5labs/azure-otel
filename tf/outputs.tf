@@ -8,6 +8,11 @@ output "subscription_id" {
   value       = data.azurerm_client_config.current.subscription_id
 }
 
+output "azure_tenant_id" {
+  description = "Microsoft Entra tenant ID for the deployment."
+  value       = data.azurerm_client_config.current.tenant_id
+}
+
 output "workspace_id" {
   description = "Azure resource ID of the Log Analytics workspace."
   value       = module.log_analytics.workspace_id
@@ -95,9 +100,29 @@ output "otel_service_principal_tenant_id" {
 }
 
 output "otel_service_principal_client_secret" {
-  description = "Sensitive client secret for OTEL collector authentication; expires 12 months after creation."
+  description = "Sensitive client secret for the external Collector's Azure Monitor receiver; expires 12 months after creation."
   value       = try(module.otel_service_principal[0].client_secret, null)
   sensitive   = true
+}
+
+output "otel_agent_managed_identity_client_id" {
+  description = "Client ID of the user-assigned managed identity federated to the AKS OTEL agent."
+  value       = try(azurerm_user_assigned_identity.otel_agent[0].client_id, null)
+}
+
+output "otel_oidc_audience" {
+  description = "Audience claim expected on OTLP access tokens sent to the external Collector."
+  value       = try(azuread_application.otel_receiver[0].client_id, null)
+}
+
+output "otel_otlp_scope" {
+  description = "Microsoft Entra scope requested by the AKS OTEL agent when exporting OTLP."
+  value       = "${local.otel_receiver_identifier_uri}/.default"
+}
+
+output "otel_agent_oidc_issuer_url" {
+  description = "AKS OIDC issuer URL trusted by the agent's federated managed identity."
+  value       = try(module.aks_control_plane[0].oidc_issuer_url, null)
 }
 
 output "worker_node_pool_name" {

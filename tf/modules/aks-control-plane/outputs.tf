@@ -17,3 +17,8 @@ output "kubernetes_version" {
   description = "AKS Kubernetes version used by the control plane."
   value       = azurerm_kubernetes_cluster.this.kubernetes_version
 }
+
+output "oidc_issuer_url" {
+  description = "OIDC issuer URL used by AKS Workload Identity."
+  value       = azurerm_kubernetes_cluster.this.oidc_issuer_url
+}
