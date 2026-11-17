@@ -1,9 +1,10 @@
 # Central OpenTelemetry Observability Architecture
 
-This design centralizes AKS pod logs, node/pod metrics, and Azure Monitor
-platform metrics from subscriptions across one or more Azure tenants in an
-Observability domain outside Azure. Per-cluster agents send logs and
-`kubeletstats` metrics to the central OTLP endpoint at
+This design centralizes AKS pod logs, node/pod metrics, Kubernetes API
+cluster-level metrics, and Azure Monitor platform metrics from subscriptions
+across one or more Azure tenants in an Observability domain outside Azure.
+Per-cluster agents send logs and metrics from `kubeletstats` and `k8s_cluster`
+to the central OTLP endpoint at
 `https://otel.cg5labs.net:4318` using AKS Workload Identity. The external
 Collector independently reads Azure Monitor metrics using tenant-scoped service
 principals and forwards logs to VictoriaLogs and metrics to VictoriaMetrics.
@@ -35,14 +36,17 @@ Docker Compose observability stack on the external local workstation.
    token with OIDC. Its logs pipeline forwards accepted records to VictoriaLogs
    using OTLP/HTTP.
 
-### AKS node and pod metrics
+### AKS node, pod, and cluster metrics
 
 The `otel-agent` DaemonSet uses the `kubeletstats` receiver to collect node and
-pod metrics from the local kubelet. Its metrics pipeline exports OTLP/HTTP over
-TLS to the same external Collector endpoint, reusing the agent's Workload
-Identity token and trusted CA. The external Collector's OIDC-authenticated OTLP
-receiver feeds those metrics into its Prometheus remote-write pipeline to
-VictoriaMetrics. Traces are not enabled.
+pod metrics from the local kubelet and the `k8s_cluster` receiver to collect
+cluster-level metrics from the Kubernetes API. The Helm chart's
+`clusterMetrics` preset adds the receiver's RBAC and lease-based leader
+election, so only one DaemonSet replica collects cluster metrics at a time.
+The metrics pipeline exports OTLP/HTTP over TLS to the same external Collector
+endpoint, reusing the agent's Workload Identity token and trusted CA. The
+external Collector's OIDC-authenticated OTLP receiver feeds those metrics into
+its Prometheus remote-write pipeline to VictoriaMetrics. Traces are not enabled.
 
 ### Azure Monitor metrics
 
@@ -61,7 +65,7 @@ separate, least-privilege role assignments.
 
 | Rollout scope | Requirements |
 | --- | --- |
-| Each AKS cluster sending logs and node/pod metrics | Record tenant, subscription, cluster, and resource group. Enable the AKS OIDC issuer and Workload Identity webhook. Create a cluster-scoped UAMI and federated credential matching that cluster's issuer, `system:serviceaccount:otel-agent:otel-agent` subject, and `api://AzureADTokenExchange` audience. Install the agent with the Workload Identity pod label and service-account annotation; the `kubeletMetrics` chart preset grants the agent access to `nodes/stats`. Grant the identity the Collector API's `Telemetry.Write` role in the API's tenant, configure its scope and audience, trust the Collector server CA, and allow outbound DNS/TCP 4318. |
+| Each AKS cluster sending logs and node/pod/cluster metrics | Record tenant, subscription, cluster, and resource group. Enable the AKS OIDC issuer and Workload Identity webhook. Create a cluster-scoped UAMI and federated credential matching that cluster's issuer, `system:serviceaccount:otel-agent:otel-agent` subject, and `api://AzureADTokenExchange` audience. Install the agent with the Workload Identity pod label and service-account annotation; the `kubeletMetrics` preset grants `nodes/stats` access, and `clusterMetrics` adds cluster-read RBAC plus leader election. Grant the identity the Collector API's `Telemetry.Write` role in the API's tenant, configure its scope and audience, trust the Collector server CA, and allow outbound DNS/TCP 4318. |
 | Each subscription supplying metrics | Record the subscription ID and the resource groups containing target AKS resources. Grant the tenant's metrics SPN `Azure Monitor Metrics Resource Discovery Reader` at the subscription and `Monitoring Reader` on each target resource group. Include the subscription and resource-group scopes in the Collector receiver configuration, then verify resource discovery and metric reads. |
 | Each Azure tenant | Provide a tenant-local metrics SPN, or an explicitly configured and consented multi-tenant application identity, for Azure Monitor access. Configure the central OTLP API trust and role assignment for agents from that tenant. The Collector must trust the intended token issuer and audience for every onboarded tenant. Keep each tenant's credential and RBAC boundary identifiable and independently revocable. |
 | Central Observability domain | Publish the OTLP/HTTP endpoint, maintain its server certificate and trusted CA distribution, and provide controlled connectivity from each AKS network. Secure the Collector's tenant credentials and verify its outbound access to Azure Monitor and its configured VictoriaMetrics/VictoriaLogs endpoints. |
