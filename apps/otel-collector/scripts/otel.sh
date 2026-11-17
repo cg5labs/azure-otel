@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# otel.sh - Start or stop the OTEL Collector Compose service.
+# otel.sh - Start or stop the Azure OTEL Compose stack.
 #
 # Usage:
 #   ./otel.sh --start
@@ -8,9 +8,9 @@
 #
 # --start runs setenv.sh to refresh Azure settings and kubeconfig, bring down
 # the Compose project, and clear Event Hub checkpoints. It then sources .env
-# and starts the otel-collector service. Checkpoint reset can prevent replay
+# and starts all Compose services. Checkpoint reset can prevent replay
 # of messages pending in Event Hubs before startup.
-# --stop stops the otel-collector service without removing its container.
+# --stop stops all Compose services without removing their containers.
 #
 # Requires Docker Compose; --start also requires the tools used by setenv.sh.
 set -Eeuo pipefail
@@ -44,6 +44,18 @@ start_stack() {
     return 1
   fi
 
+  if [[ ! -f "$ENV_FILE" || -L "$ENV_FILE" ]]; then
+    printf 'Expected a regular environment file at %s.\n' "$ENV_FILE" >&2
+    return 1
+  fi
+
+  # Reject missing Grafana settings before setup removes containers and checkpoints.
+  (
+    source "$ENV_FILE"
+    : "${GRAFANA_ADMIN_USER:?Set GRAFANA_ADMIN_USER in .env}"
+    : "${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}"
+  )
+
   printf 'Refreshing Azure environment settings and AKS kubeconfig.\n'
   "$SETENV_SCRIPT"
 
@@ -58,13 +70,13 @@ start_stack() {
   source "$ENV_FILE"
   set +a
 
-  printf 'Starting the OTEL Collector service.\n'
+  printf 'Starting the Azure OTEL Compose stack.\n'
   docker compose \
     --project-directory "$AZURE_OTEL_DIR" \
     --env-file "$ENV_FILE" \
     -f "$COMPOSE_FILE" \
-    up -d --remove-orphans otel-collector
-  printf 'OTEL Collector service is started.\n'
+    up -d --remove-orphans
+  printf 'Azure OTEL Compose stack is started.\n'
 }
 
 stop_stack() {
@@ -73,13 +85,13 @@ stop_stack() {
     return 1
   fi
 
-  printf 'Stopping the OTEL Collector service.\n'
+  printf 'Stopping the Azure OTEL Compose stack.\n'
   docker compose \
     --project-directory "$AZURE_OTEL_DIR" \
     --env-file "$ENV_FILE" \
     -f "$COMPOSE_FILE" \
-    stop otel-collector
-  printf 'OTEL Collector service is stopped.\n'
+    stop
+  printf 'Azure OTEL Compose stack is stopped.\n'
 }
 
 main() {

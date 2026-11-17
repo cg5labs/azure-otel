@@ -3,16 +3,24 @@ receivers:
     protocols:
       grpc:
         endpoint: 0.0.0.0:4317
+        auth:
+          authenticator: oidc
+          # authenticator: bearertokenauth
         tls:
           cert_file: /server-certs/server.crt
           key_file: /server-certs/server.key
-          client_ca_file: /certs/ca.crt
+          # Client-certificate authentication is disabled; validate Entra tokens with OIDC.
+          # client_ca_file: /certs/ca.crt
       http:
         endpoint: 0.0.0.0:4318
+        auth:
+          authenticator: oidc
+          # authenticator: bearertokenauth
         tls:
           cert_file: /server-certs/server.crt
           key_file: /server-certs/server.key
-          client_ca_file: /certs/ca.crt
+          # Client-certificate authentication is disabled; validate Entra tokens with OIDC.
+          # client_ca_file: /certs/ca.crt
   azuremonitor:
     subscription_ids:
       - ${env:AZURE_SUBSCRIPTION_ID}
@@ -49,8 +57,21 @@ exporters:
   debug:
     verbosity: detailed
     #verbosity: basic
+  otlphttp/victoria_logs:
+    logs_endpoint: http://victoria-logs:9428/insert/opentelemetry/v1/logs
+  prometheusremotewrite/victoria_metrics:
+    endpoint: http://victoria-metrics:8428/api/v1/write
+    resource_to_telemetry_conversion:
+      enabled: true
 
 extensions:
+  oidc:
+    providers:
+      - issuer_url: https://login.microsoftonline.com/${env:AZURE_TENANT_ID}/v2.0
+        audience: ${env:OTEL_OIDC_AUDIENCE}
+  # bearertokenauth:
+  #   scheme: Bearer
+  #   token: ${env:OTEL_API_KEY}
   health_check:
     endpoint: 0.0.0.0:13133
   file_storage:
@@ -63,12 +84,12 @@ extensions:
       client_secret: ${env:AZURE_CLIENT_SECRET}
 
 service:
-  extensions: [health_check, azureauth, file_storage]
+  extensions: [health_check, azureauth, file_storage, oidc]
   pipelines:
     logs:
       receivers: [ otlp ]
       processors: [ memory_limiter, batch ]
-      exporters: [ debug ]
+      exporters: [ otlphttp/victoria_logs ]
     logs/eventhub:
       receivers: [ azureeventhub ]
       processors: [ memory_limiter, transform/eventhub_json, batch ]
@@ -76,4 +97,4 @@ service:
     metrics:
       receivers: [azuremonitor]
       processors: [memory_limiter, batch]
-      exporters: [debug]
+      exporters: [prometheusremotewrite/victoria_metrics]

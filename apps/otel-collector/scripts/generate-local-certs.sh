@@ -1,11 +1,61 @@
 #!/bin/sh
 set -eu
 
-cert_dir="${1:-certs}"
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+project_dir=$(CDPATH= cd -- "$script_dir/.." && pwd)
+cert_dir="${1:-$project_dir/certs}"
+server_dns_names="${OTEL_SERVER_DNS_NAMES:-otel-collector,localhost}"
+server_ip_addresses="${OTEL_SERVER_IP_ADDRESSES:-}"
+server_common_name="${server_dns_names%%,*}"
+server_sans=""
 umask 077
+
+append_server_sans() {
+    san_type="$1"
+    san_values="$2"
+    old_ifs="$IFS"
+
+    [ -n "$san_values" ] || return 0
+    IFS=,
+    for san_value in $san_values; do
+        case "$san_type:$san_value" in
+            DNS:)
+                printf 'DNS Subject Alternative Names cannot be empty.\n' >&2
+                exit 1
+                ;;
+            DNS:.*|DNS:*..*|DNS:*.|DNS:*[!A-Za-z0-9.-]*)
+                printf 'Invalid DNS Subject Alternative Name: %s\n' "$san_value" >&2
+                exit 1
+                ;;
+            IP:)
+                printf 'IP Subject Alternative Names cannot be empty.\n' >&2
+                exit 1
+                ;;
+            IP:*[!0-9.:]*)
+                printf 'Invalid IP Subject Alternative Name: %s\n' "$san_value" >&2
+                exit 1
+                ;;
+        esac
+
+        if [ -n "$server_sans" ]; then
+            server_sans="$server_sans,"
+        fi
+        server_sans="$server_sans$san_type:$san_value"
+    done
+    IFS="$old_ifs"
+}
+
+append_server_sans DNS "$server_dns_names"
+append_server_sans IP "$server_ip_addresses"
+
+if [ -z "$server_sans" ]; then
+    printf 'At least one valid server DNS or IP Subject Alternative Name is required.\n' >&2
+    exit 1
+fi
+
 mkdir -p "$cert_dir/ca" "$cert_dir/server" "$cert_dir/client"
-mkdir -p logs
-chmod 2770 logs
+mkdir -p "$project_dir/logs"
+chmod 2770 "$project_dir/logs"
 
 for file in ca/ca.key ca/ca.crt server/server.key server/server.crt client/client.key client/client.crt; do
     if [ -e "$cert_dir/$file" ]; then
@@ -24,9 +74,9 @@ openssl req -x509 -newkey rsa:3072 -nodes -sha256 -days 365 \
 openssl req -newkey rsa:2048 -nodes \
     -keyout "$cert_dir/server/server.key" \
     -out "$cert_dir/server/server.csr" \
-    -subj "/CN=otel-collector"
+    -subj "/CN=$server_common_name"
 printf '%s\n' \
-    'subjectAltName=DNS:otel-collector,DNS:localhost' \
+    "subjectAltName=$server_sans" \
     'extendedKeyUsage=serverAuth' \
     'keyUsage=digitalSignature,keyEncipherment' > "$cert_dir/server/server.ext"
 openssl x509 -req -sha256 -days 365 \

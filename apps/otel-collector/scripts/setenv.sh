@@ -19,6 +19,7 @@ UPDATE_KEYS=(
   AZURE_RESOURCE_GROUP
   AZURE_EVENTHUB_CONNECTION_STRING
   AZURE_EVENTHUB_CONSUMER_GROUP
+  OTEL_OIDC_AUDIENCE
 )
 declare -A ENV_VALUES=()
 declare -A WRITTEN_KEYS=()
@@ -63,16 +64,17 @@ quote_env_value() {
   printf "'%s'" "$value"
 }
 
-# Load only the values needed by the Azure Monitor and Event Hubs receivers.
+# Load the Azure receiver settings and the Entra audience for OTLP ingress.
 read_tofu_outputs() {
   printf 'Loading Azure and Event Hubs settings from OpenTofu.\n'
-  ENV_VALUES[AZURE_TENANT_ID]="$(read_tofu_output otel_service_principal_tenant_id)"
+  ENV_VALUES[AZURE_TENANT_ID]="$(read_tofu_output azure_tenant_id)"
   ENV_VALUES[AZURE_CLIENT_ID]="$(read_tofu_output otel_service_principal_client_id)"
   ENV_VALUES[AZURE_CLIENT_SECRET]="$(read_tofu_output otel_service_principal_client_secret)"
   ENV_VALUES[AZURE_SUBSCRIPTION_ID]="$(read_tofu_output subscription_id)"
   ENV_VALUES[AZURE_RESOURCE_GROUP]="$(read_tofu_output resource_group_name)"
   ENV_VALUES[AZURE_EVENTHUB_CONNECTION_STRING]="$(read_tofu_output eventhub_sas_connection_string)"
   ENV_VALUES[AZURE_EVENTHUB_CONSUMER_GROUP]="$(read_tofu_output eventhub_consumer_group)"
+  ENV_VALUES[OTEL_OIDC_AUDIENCE]="$(read_tofu_output otel_oidc_audience)"
   AKS_CLUSTER_NAME="$(read_tofu_output kubernetes_cluster_name)"
 }
 
@@ -120,6 +122,7 @@ stop_compose_and_reset_checkpoints() {
   printf 'Stopping and removing all containers in the Azure OTEL Compose project.\n'
   docker compose \
     --project-directory "$AZURE_OTEL_DIR" \
+    --env-file "$ENV_FILE" \
     -f "$AZURE_OTEL_DIR/compose.yaml" \
     down --remove-orphans
   printf 'Compose containers are stopped.\n'
@@ -172,7 +175,8 @@ write_env_file() {
   printf 'Updated .env with OpenTofu outputs; secret values were not displayed.\n'
 }
 
-# Validate prerequisites, load outputs, configure Azure access, then update .env.
+# Validate prerequisites, load outputs, configure Azure access, update .env,
+# then stop the Compose stack and reset checkpoints.
 main() {
   local command_name
 
@@ -197,8 +201,8 @@ main() {
   read_tofu_outputs
   authenticate_azure
   set_aks_kubeconfig
-  stop_compose_and_reset_checkpoints
   write_env_file
+  stop_compose_and_reset_checkpoints
 }
 
 main "$@"
