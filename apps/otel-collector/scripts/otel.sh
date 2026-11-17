@@ -49,13 +49,6 @@ start_stack() {
     return 1
   fi
 
-  # Reject missing Grafana settings before setup removes containers and checkpoints.
-  (
-    source "$ENV_FILE"
-    : "${GRAFANA_ADMIN_USER:?Set GRAFANA_ADMIN_USER in .env}"
-    : "${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}"
-  )
-
   printf 'Refreshing Azure environment settings and AKS kubeconfig.\n'
   "$SETENV_SCRIPT"
 

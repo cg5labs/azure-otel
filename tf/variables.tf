@@ -281,6 +281,12 @@ variable "enable_azure_monitor_metrics" {
   default     = true
 }
 
+variable "enable_otel_metrics_reader" {
+  description = "Enable the external OTEL Collector's Azure Monitor metrics reader identity and role assignments."
+  type        = bool
+  default     = true
+}
+
 variable "otel_service_principal_display_name" {
   description = "Display name of the Entra application and service principal used by the OTEL collector."
   type        = string

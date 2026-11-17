@@ -140,7 +140,7 @@ stop_compose_and_reset_checkpoints() {
   printf 'Checkpoint data cleared; recreated the empty bind-mount directory.\n'
 }
 
-# Atomically update Azure-specific .env keys and retain unrelated local settings.
+# Update Azure .env keys, remove old Grafana credentials, and preserve other settings.
 write_env_file() {
   local line key
 
@@ -151,6 +151,9 @@ write_env_file() {
 
   while IFS= read -r line || [[ -n "$line" ]]; do
     key="${line%%=*}"
+    case "$key" in
+      GRAFANA_ADMIN_USER|GRAFANA_ADMIN_PASSWORD) continue ;;
+    esac
     if [[ "$line" == *=* && -n "${ENV_VALUES[$key]+set}" ]]; then
       if [[ -z "${WRITTEN_KEYS[$key]+set}" ]]; then
         printf '%s=%s\n' "$key" "$(quote_env_value "${ENV_VALUES[$key]}")" \

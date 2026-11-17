@@ -3,66 +3,76 @@
 This OpenTofu root creates a resource group, a Log Analytics workspace, the
 network prerequisites, an AKS cluster with a Spot worker pool, an Azure
 Container Registry (ACR), and an Event Hubs destination for exported AKS logs.
-The workspace and the Data Reader assignment for the identity running OpenTofu
-are managed by the local `tf/modules/log-analytics` child module. AKS,
-worker-pool, registry, and Event Hubs settings are managed by separate local
-modules.
+It also provisions Workload Identity resources for the node-local OTEL agent,
+which is deployed separately with Helm. The workspace and the Data Reader
+assignment for the identity running OpenTofu are managed by the local
+`tf/modules/log-analytics` child module. AKS, worker-pool, registry, and Event
+Hubs settings are managed by separate local modules.
 
 ## Architecture overview
 
-OpenTofu provisions the Azure-side resources. The OpenTelemetry Collector is
-deployed separately with Docker Compose and runs outside the Azure subscription:
+OpenTofu provisions the Azure-side resources. The external OpenTelemetry
+Collector runs outside Azure with Docker Compose. A separate Helm release runs
+an `otel-agent` Collector DaemonSet on eligible AKS user nodes:
 
 ```text
+ AKS nodes and pods
+   ├─ container logs (/var/log/pods) ───┐
+   └─ node/pod metrics (local kubelet) ─┤
+                                        v
+                    [otel-agent DaemonSet: file_log + kubeletstats]
+                              k8s_attributes processor
+                                        │
+                   OTLP/HTTP + TLS + AKS Workload Identity
+                                        v
+                         [External OTEL Collector]
+                           │                   │
+                    OTLP logs             OTLP metrics
+                           v                   v
+                     VictoriaLogs       VictoriaMetrics
+                                             ^
+                           Azure Monitor ────┘
+                       (azuremonitor receiver)
 
-    +-------------------->  +------------------+  ------------------------------------------+
-    |         metrics       | Azure Monitor    |            AZ Monitor OTEL Receiver        |
-    |                       +------------------+                                            |
-    |                                                                                       |
-    |                                                                                       v
-+-------+                                                                            +------------------+
-| AKS   |                                                                            | OTEL Collector   |
-+-------+                                                                            +------------------+
-    |                                                                                       ^
-    |                                                                                       |
-    |                                                                                       |
-    +--------------------> +-------+  ------------->  +-------------+ ----------------------+
-            pod / CP logs  | LAW   |    table export  | Event Hubs  |   AZ EH OTEL Receiver
-                           +-------+                  | buffer      |
-                                                      +-------------+
+ AKS Container Insights/control-plane logs ──> Log Analytics
+                                               └─> Event Hubs
+                                                   └─> azureeventhub receiver
+                                                       └─> VictoriaLogs
 ```
 
-[![OpenTelemetry Azure metrics and logs architecture](doc/diagrams/otel-azure-overview.png)](doc/diagrams/otel-azure-overview.png)
+[![AKS infrastructure, subscription and VNet boundaries, and local OTEL stack](doc/aks-otel-flow.png)](doc/OTEL-ARCH.md)
 
-**Metrics:** AKS managed metrics are exposed through Azure Monitor. The
-Collector's Azure Monitor receiver queries the configured subscription and
-resource group every 60 seconds using the generated service principal. That
-identity has subscription-level resource discovery access and **Monitoring
-Reader** on the AKS resource group.
+**AKS node-local collection:** The
+[`otel-agent` Helm release](tf/helm/otel-collector-agent-values.yaml) runs as
+a DaemonSet on eligible user nodes. Its `file_log` receiver tails pod
+container logs from `/var/log/pods`; its `kubeletstats` receiver polls the
+local kubelet for node and pod metrics. The `k8s_attributes` processor
+enriches both signals. The agent exports both pipelines as OTLP/HTTP to
+`https://otel.cg5labs.net:4318`. AKS Workload Identity supplies the Entra
+token, and the mounted CA verifies the external Collector's TLS certificate.
+The chart preset grants the agent `nodes/stats` access for kubelet metrics.
 
-**Logs:** Container Insights collects pod/container logs and Kubernetes events
-using the AKS-associated DCR/DCRA and writes them to Log Analytics. AKS
-control-plane diagnostics are also sent to the workspace. The Event Hubs module
-configures a continuous Log Analytics data export for the selected supported
-tables. Event Hubs buffers the exported records so Collector availability is
-decoupled from workspace export; its retention is finite, and export does not
-backfill data from before the rule became active.
+**External Collector:** The OTLP receiver validates the Entra token with OIDC.
+Its logs pipeline forwards OTLP logs to VictoriaLogs; its metrics pipeline
+accepts OTLP metrics and writes them to VictoriaMetrics. A separate
+`azuremonitor` receiver queries Azure platform metrics every 60 seconds using
+the external Collector's metrics-reader service principal and sends those
+metrics to VictoriaMetrics as well.
 
-**Traces (reference architecture only):** Instrument AKS applications with an
-OTLP SDK or auto-instrumentation and send traces to an in-cluster OTEL Collector
-Service. That Collector can batch, enrich, and buffer telemetry before sending
-it upstream to the external Collector over private connectivity, or over
-TLS/mTLS with restricted ingress. This is documentation only: neither the
-in-cluster Collector nor this traces flow is provisioned by Terraform or
-included in the current OTEL configuration.
+**Log Analytics/Event Hubs:** Container Insights collects pod/container logs
+and Kubernetes events through the AKS-associated DCR/DCRA; AKS control-plane
+diagnostics also go to Log Analytics. The Event Hubs module exports supported
+workspace tables continuously. The external Collector's `azureeventhub`
+receiver decodes and parses the exported JSON records, then sends them to
+VictoriaLogs through the OTLP/HTTP exporter. Event Hubs retention is finite,
+and export does not backfill records from before the rule became active.
 
-The external Collector consumes Event Hubs with a Listen-only SAS connection
-and persists consumer checkpoints in its mounted storage. It also accepts OTLP
-logs from clients. Although OTLP gRPC and HTTP endpoints are exposed, no traces
-pipeline is configured. The included logs and metrics pipelines currently send
-signals to the debug exporter (Collector stdout); add a production exporter to
-forward them to a telemetry backend. The Collector deployment and configuration are documented in
-[`apps/otel-collector`](apps/otel-collector/README.md).
+Traces are not enabled. The Collector's OTLP gRPC and HTTP receiver ports are
+available, but only logs and metrics pipelines are configured. The full
+external Collector setup is documented in
+[`apps/otel-collector`](apps/otel-collector/README.md); the editable
+infrastructure diagram and signal-path details are in
+[`doc/OTEL-ARCH.md`](doc/OTEL-ARCH.md).
 
 ## Layout
 
@@ -133,6 +143,24 @@ tofu -chdir=tf plan -var-file=dev/terraform.tfvars
 tofu -chdir=tf apply -var-file=dev/terraform.tfvars
 ```
 
+### Deploy the AKS node-local OTEL agent
+
+After AKS and the Collector endpoint are ready, deploy or upgrade the agent
+DaemonSet with the external Collector URL and its CA certificate:
+
+```sh
+OTEL_AGENT_OTLP_ENDPOINT=https://otel.cg5labs.net:4318 \
+OTEL_AGENT_CA_FILE=/path/to/collector-ca.crt \
+./tf/scripts/otel-agent.sh
+```
+
+The helper reads the agent identity and OTLP scope from OpenTofu outputs,
+configures AKS Workload Identity, creates the CA Secret, and installs the
+Helm chart. The endpoint must be reachable from AKS and its certificate must
+match the endpoint hostname. The agent values and deployment helper are
+[`tf/helm/otel-collector-agent-values.yaml`](tf/helm/otel-collector-agent-values.yaml)
+and [`tf/scripts/otel-agent.sh`](tf/scripts/otel-agent.sh).
+
 The workspace uses the `PerGB2018` pay-as-you-go SKU, 30-day retention, and a
 1 GiB daily ingestion quota by default. Resource-level workspace access,
 internet ingestion/query, and local authentication are enabled by default.
@@ -140,16 +168,23 @@ The AKS defaults use one Standard_D2s_v7 system node and one Standard_D2s_v7
 Spot worker node. Spot VMs can be evicted and have no guaranteed capacity;
 `spot_max_price = -1` permits paying up to the on-demand price.
 
-Azure Monitor managed metrics and AKS logs to Log Analytics are each enabled
-by default. When AKS and metrics are enabled, the
-`tf/modules/otel-service-principal` module creates an Entra application, service
-principal, and 12-month client secret.
-The generated service principal object ID is passed to the AKS control-plane
-module, which grants it the custom subscription-scoped resource-discovery
-role and **Monitoring Reader** on the AKS resource group. Set
-`enable_azure_monitor_metrics = false` to disable managed AKS metrics and omit
-the OTEL service principal; disabling it after provisioning plans to destroy
-the identity, secret, and associated role assignments. Set
+Azure Monitor managed metrics and AKS logs to Log Analytics are enabled by the
+root defaults. The dev configuration disables the AKS-managed metrics add-on
+while leaving the external Collector's Azure Monitor reader enabled. These are
+independent settings: `enable_azure_monitor_metrics` controls the AKS-managed
+add-on, while `enable_otel_metrics_reader` controls the external Collector's
+metrics-reader identity and Azure RBAC. When AKS and the reader are enabled,
+the `tf/modules/otel-service-principal` module creates an Entra application,
+service principal, and 12-month client secret. The AKS control-plane module
+grants it the custom subscription-scoped resource-discovery role and
+**Monitoring Reader** on the AKS resource group.
+
+Set `enable_azure_monitor_metrics = false` to disable only the AKS-managed
+metrics add-on; the node-local OTEL agent and external Azure Monitor receiver
+remain independent. Set `enable_otel_metrics_reader = false` to omit the
+external Collector's service principal and reader role assignments. Disabling
+the reader after provisioning plans to destroy its identity, secret, and
+associated role assignments. Set
 `enable_azure_monitor_logs = false` to disable Container Insights, its DCR/DCRA
 (including ContainerLogV2, KubeEvents, and KubePodInventory streams), and AKS
 control-plane diagnostic logs to LAW. ContainerLogV2 collection is enabled

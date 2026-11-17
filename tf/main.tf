@@ -16,7 +16,7 @@ locals {
 data "azurerm_client_config" "current" {}
 
 module "otel_service_principal" {
-  count  = var.enable_aks && var.enable_azure_monitor_metrics ? 1 : 0
+  count  = var.enable_aks && var.enable_otel_metrics_reader ? 1 : 0
   source = "./modules/otel-service-principal"
 
   display_name = var.otel_service_principal_display_name
@@ -108,7 +108,7 @@ module "aks_control_plane" {
   dns_service_ip                   = var.dns_service_ip
   pod_cidr                         = var.pod_cidr
   enable_azure_monitor_metrics     = var.enable_azure_monitor_metrics
-  enable_otel_metrics_reader       = var.enable_azure_monitor_metrics
+  enable_otel_metrics_reader       = var.enable_otel_metrics_reader
   enable_azure_monitor_logs        = var.enable_azure_monitor_logs
   enable_defender                  = var.enable_defender
   tags                             = local.common_tags

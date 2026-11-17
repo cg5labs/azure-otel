@@ -9,6 +9,8 @@ command:
   name: otelcol-contrib
 
 presets:
+  kubeletMetrics:
+    enabled: true
   kubernetesAttributes:
     enabled: true
 
@@ -65,7 +67,14 @@ config:
           - otlp_http
         receivers:
           - file_log
-      metrics: null
+      metrics:
+        exporters:
+          - otlp_http
+        processors:
+          - memory_limiter
+          - batch
+        receivers:
+          - kubeletstats
       traces: null
     telemetry:
       metrics:

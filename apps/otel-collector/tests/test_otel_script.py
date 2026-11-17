@@ -20,10 +20,7 @@ class StackLifecycleTests(unittest.TestCase):
         shutil.copyfile(APP_DIR / "scripts/otel.sh", self.script)
         (self.root / "compose.yaml").touch()
         self.env_file = self.root / ".env"
-        self.env_file.write_text(
-            "GRAFANA_ADMIN_USER='local-admin'\n"
-            "GRAFANA_ADMIN_PASSWORD='literal-$password# with spaces\\end'\n"
-        )
+        self.env_file.write_text("CERT_GID='1234'\n")
         self.calls = self.root / "calls"
         self.calls.touch()
         self.environment = {
@@ -67,7 +64,6 @@ class StackLifecycleTests(unittest.TestCase):
         self.assertEqual(len(calls), 3)
         self.assertTrue(calls[2].endswith(" up -d --remove-orphans"))
         self.assertIn(f"--project-directory {self.root}", calls[2])
-        self.assertNotIn("literal-", result.stdout + result.stderr)
 
     def test_stop_manages_entire_stack_without_setup(self):
         result = self.run_script("--stop")
@@ -77,41 +73,12 @@ class StackLifecycleTests(unittest.TestCase):
         self.assertTrue(calls[1].endswith(" stop"))
         self.assertNotIn("setup", calls)
 
-    def test_missing_credentials_fail_before_setup(self):
-        for contents, missing in [
-            ("GRAFANA_ADMIN_USER='admin'\n", "GRAFANA_ADMIN_PASSWORD"),
-            ("GRAFANA_ADMIN_PASSWORD='test'\n", "GRAFANA_ADMIN_USER"),
-            (
-                "GRAFANA_ADMIN_USER='admin'\nGRAFANA_ADMIN_PASSWORD=''\n",
-                "GRAFANA_ADMIN_PASSWORD",
-            ),
-        ]:
-            with self.subTest(missing=missing, contents=contents):
-                self.calls.write_text("")
-                self.env_file.write_text(contents)
-                result = self.run_script("--start")
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn(f"Set {missing} in .env", result.stderr)
-                self.assertEqual(self.calls.read_text(), "compose version\n")
-
     def test_missing_environment_fails_before_setup(self):
         self.env_file.unlink()
         result = self.run_script("--start")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Expected a regular environment file", result.stderr)
         self.assertEqual(self.calls.read_text(), "compose version\n")
-
-    def test_literal_credentials_are_exported_unchanged(self):
-        self.write_executable(
-            self.root / "docker",
-            '#!/usr/bin/env bash\n'
-            'if [[ "$*" == *" up -d --remove-orphans" ]]; then\n'
-            "  [[ \"$GRAFANA_ADMIN_USER\" == 'local-admin' ]] || exit 1\n"
-            "  [[ \"$GRAFANA_ADMIN_PASSWORD\" == 'literal-$password# with spaces\\end' ]] || exit 1\n"
-            'fi\n',
-        )
-        result = self.run_script("--start")
-        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_setup_failure_does_not_start_stack(self):
         self.write_executable(

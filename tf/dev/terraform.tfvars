@@ -6,7 +6,8 @@ subscription_id = "ebcd3e3d-6e5b-48ef-b0c9-cecb454edeec"
 # Enable or disable various Azure Kubernetes Service (AKS) and monitoring features
 enable_aks                          = true
 enable_aks_worker_pool              = true
-enable_azure_monitor_metrics        = true
+enable_azure_monitor_metrics        = false
+enable_otel_metrics_reader          = true
 enable_azure_monitor_logs           = true
 enable_defender                     = false
 enable_event_hub                    = true

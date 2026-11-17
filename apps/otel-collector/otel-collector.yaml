@@ -54,9 +54,6 @@ processors:
           - set(body, ParseJSON(body))
 
 exporters:
-  debug:
-    verbosity: detailed
-    #verbosity: basic
   otlphttp/victoria_logs:
     logs_endpoint: http://victoria-logs:9428/insert/opentelemetry/v1/logs
   prometheusremotewrite/victoria_metrics:
@@ -93,8 +90,8 @@ service:
     logs/eventhub:
       receivers: [ azureeventhub ]
       processors: [ memory_limiter, transform/eventhub_json, batch ]
-      exporters: [ debug ]
+      exporters: [ otlphttp/victoria_logs ]
     metrics:
-      receivers: [azuremonitor]
+      receivers: [otlp, azuremonitor]
       processors: [memory_limiter, batch]
       exporters: [prometheusremotewrite/victoria_metrics]

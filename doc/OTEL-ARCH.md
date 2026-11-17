@@ -1,20 +1,25 @@
 # Central OpenTelemetry Observability Architecture
 
-This design centralizes AKS pod logs and Azure Monitor platform metrics from
-subscriptions across one or more Azure tenants in an Observability domain
-outside Azure. Per-cluster agents send logs to the central OTLP endpoint at
-`https://otel.cg5labs.net:4318` using AKS Workload Identity; the external
-Collector independently reads Azure Monitor metrics using tenant-scoped
-service principals and forwards both signals to VictoriaLogs and VictoriaMetrics.
+This design centralizes AKS pod logs, node/pod metrics, and Azure Monitor
+platform metrics from subscriptions across one or more Azure tenants in an
+Observability domain outside Azure. Per-cluster agents send logs and
+`kubeletstats` metrics to the central OTLP endpoint at
+`https://otel.cg5labs.net:4318` using AKS Workload Identity. The external
+Collector independently reads Azure Monitor metrics using tenant-scoped service
+principals and forwards logs to VictoriaLogs and metrics to VictoriaMetrics.
 
 The configuration in this repository is a single-tenant, single-subscription
 baseline. A multi-tenant rollout requires the additional tenant trust, identity,
 RBAC, and Collector configuration described below; adding subscription IDs
 alone is insufficient.
 
-[Editable draw.io source](OTEL-ARCH.drawio) · [PNG diagram](OTEL-ARCH.png)
+The diagram presents the deployed infrastructure: AKS and its node-local
+`otel-agent` inside the Azure subscription and VNet/subnet boundaries, plus the
+Docker Compose observability stack on the external local workstation.
 
-![AKS pod-log and Azure Monitor metrics flows](OTEL-ARCH.png)
+[Editable infrastructure diagram](OTEL-ARCH.drawio) · [PNG diagram](OTEL-ARCH.png)
+
+![AKS infrastructure, subscription and VNet boundaries, and local OTEL stack](OTEL-ARCH.png)
 
 ## Data flows
 
@@ -23,21 +28,29 @@ alone is insufficient.
 1. The `otel-agent` DaemonSet reads container log files under `/var/log/pods`
    with the `file_log` receiver and enriches records with Kubernetes
    attributes.
-2. Its logs-only pipeline exports OTLP/HTTP over TLS to
+2. Its logs pipeline exports OTLP/HTTP over TLS to
    `https://otel.cg5labs.net:4318`. The agent trusts the Collector server
    certificate using the CA mounted from the `otel-agent-mtls` Secret.
 3. The Compose Collector's OTLP/HTTP receiver authenticates the Entra access
    token with OIDC. Its logs pipeline forwards accepted records to VictoriaLogs
    using OTLP/HTTP.
 
-The DaemonSet does not collect pod or node metrics and has no metrics or traces
-pipeline. The metrics flow below is independent of the agent.
+### AKS node and pod metrics
+
+The `otel-agent` DaemonSet uses the `kubeletstats` receiver to collect node and
+pod metrics from the local kubelet. Its metrics pipeline exports OTLP/HTTP over
+TLS to the same external Collector endpoint, reusing the agent's Workload
+Identity token and trusted CA. The external Collector's OIDC-authenticated OTLP
+receiver feeds those metrics into its Prometheus remote-write pipeline to
+VictoriaMetrics. Traces are not enabled.
 
 ### Azure Monitor metrics
 
 The external Collector's `azuremonitor` receiver queries AKS platform metrics
 every 60 seconds using the external Collector service principal. Its metrics
-pipeline sends samples to VictoriaMetrics through Prometheus remote write.
+pipeline sends samples to VictoriaMetrics through Prometheus remote write. This
+external collection remains enabled independently of the AKS-managed Azure
+Monitor metrics add-on, which is disabled in the dev OpenTofu configuration.
 
 ## Multi-tenant rollout requirements
 
@@ -48,7 +61,7 @@ separate, least-privilege role assignments.
 
 | Rollout scope | Requirements |
 | --- | --- |
-| Each AKS cluster sending logs | Record tenant, subscription, cluster, and resource group. Enable the AKS OIDC issuer and Workload Identity webhook. Create a cluster-scoped UAMI and federated credential matching that cluster's issuer, `system:serviceaccount:otel-agent:otel-agent` subject, and `api://AzureADTokenExchange` audience. Install the agent with the Workload Identity pod label and service-account annotation. Grant the identity the Collector API's `Telemetry.Write` role in the API's tenant, configure its scope and audience, trust the Collector server CA, and allow outbound DNS/TCP 4318. |
+| Each AKS cluster sending logs and node/pod metrics | Record tenant, subscription, cluster, and resource group. Enable the AKS OIDC issuer and Workload Identity webhook. Create a cluster-scoped UAMI and federated credential matching that cluster's issuer, `system:serviceaccount:otel-agent:otel-agent` subject, and `api://AzureADTokenExchange` audience. Install the agent with the Workload Identity pod label and service-account annotation; the `kubeletMetrics` chart preset grants the agent access to `nodes/stats`. Grant the identity the Collector API's `Telemetry.Write` role in the API's tenant, configure its scope and audience, trust the Collector server CA, and allow outbound DNS/TCP 4318. |
 | Each subscription supplying metrics | Record the subscription ID and the resource groups containing target AKS resources. Grant the tenant's metrics SPN `Azure Monitor Metrics Resource Discovery Reader` at the subscription and `Monitoring Reader` on each target resource group. Include the subscription and resource-group scopes in the Collector receiver configuration, then verify resource discovery and metric reads. |
 | Each Azure tenant | Provide a tenant-local metrics SPN, or an explicitly configured and consented multi-tenant application identity, for Azure Monitor access. Configure the central OTLP API trust and role assignment for agents from that tenant. The Collector must trust the intended token issuer and audience for every onboarded tenant. Keep each tenant's credential and RBAC boundary identifiable and independently revocable. |
 | Central Observability domain | Publish the OTLP/HTTP endpoint, maintain its server certificate and trusted CA distribution, and provide controlled connectivity from each AKS network. Secure the Collector's tenant credentials and verify its outbound access to Azure Monitor and its configured VictoriaMetrics/VictoriaLogs endpoints. |
@@ -146,11 +159,12 @@ lifecycle; they protect transport and do not replace Entra authentication.
 
 | Component | Source |
 | --- | --- |
-| Agent log pipeline, Workload Identity extension, CA mount, and user-pool selection | [Helm values](helm/otel-collector-agent-values.yaml) |
-| Service-account annotation, endpoint, and deployment wiring | [Agent deployment script](scripts/otel-agent.sh) |
-| UAMI, federated credential, Collector API app role, and role assignment | [OpenTofu root](main.tf) |
-| Azure Monitor SPN permissions | [AKS control-plane module](modules/aks-control-plane/main.tf) |
-| External Collector SPN and client secret | [OTEL service-principal module](modules/otel-service-principal/main.tf) |
-| Identity, audience, issuer, scope, and SPN outputs | [OpenTofu outputs](outputs.tf) |
-| OTLP TLS/OIDC receiver, Azure Monitor receiver, and Victoria exporters | [External Collector config](../../python/azure-otel/otel-collector.yaml) |
-| External Collector environment, certificates, and published OTLP ports | [Compose service](../../python/azure-otel/compose.yaml) |
+| Agent log/metrics pipelines, Workload Identity extension, CA mount, and user-pool selection | [Helm values](../tf/helm/otel-collector-agent-values.yaml) |
+| Service-account annotation, endpoint, and deployment wiring | [Agent deployment script](../tf/scripts/otel-agent.sh) |
+| UAMI, federated credential, Collector API app role, and role assignment | [OpenTofu root](../tf/main.tf) |
+| Azure Monitor SPN permissions | [AKS control-plane module](../tf/modules/aks-control-plane/main.tf) |
+| AKS-managed metrics add-on and external Collector metrics-reader toggle | [OpenTofu variables](../tf/variables.tf) |
+| External Collector SPN and client secret | [OTEL service-principal module](../tf/modules/otel-service-principal/main.tf) |
+| Identity, audience, issuer, scope, and SPN outputs | [OpenTofu outputs](../tf/outputs.tf) |
+| OTLP TLS/OIDC receiver, Azure Monitor receiver, and Victoria exporters | [External Collector config](../apps/otel-collector/otel-collector.yaml) |
+| External Collector environment, certificates, and published OTLP ports | [Compose service](../apps/otel-collector/compose.yaml) |

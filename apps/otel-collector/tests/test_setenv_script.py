@@ -114,8 +114,9 @@ class SetenvTests(unittest.TestCase):
         }.items():
             self.assertIn(f"{key}='{value}'", updated)
         self.assertIn("CERT_GID='1234'", updated)
-        self.assertIn("GRAFANA_ADMIN_USER='local-admin'", updated)
-        self.assertIn("GRAFANA_ADMIN_PASSWORD='local-password'", updated)
+        self.assertNotIn("GRAFANA_ADMIN_USER", updated)
+        self.assertNotIn("GRAFANA_ADMIN_PASSWORD", updated)
+        self.assertNotIn("local-password", result.stdout + result.stderr)
         self.assertFalse((self.checkpoint_dir / "old-checkpoint").exists())
         self.assertTrue(self.checkpoint_dir.is_dir())
         self.assertNotIn("secret-from-tofu", result.stdout + result.stderr)

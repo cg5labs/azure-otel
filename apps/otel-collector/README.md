@@ -2,25 +2,26 @@
 
 This directory contains a local Docker Compose deployment of the OpenTelemetry
 Collector Contrib distribution. The Collector receives Azure platform logs
-through Event Hubs, collects AKS managed metrics from Azure Monitor, and
-accepts OTLP logs over TLS with Microsoft Entra ID token authentication.
+through Event Hubs, collects AKS metrics from its OTLP receiver and Azure Monitor,
+and accepts OTLP logs and metrics over TLS with Microsoft Entra ID token
+authentication.
 Client-certificate authentication is disabled. Azure infrastructure is provisioned
 separately with OpenTofu; see the
 [Azure foundation README](../../terraform/otel-azure/README.md). The AKS
 node-local Collector agent is deployed separately with Helm and sends pod logs
-to this Collector over TLS-protected OTLP/HTTP using Azure Workload Identity.
+and node/pod metrics to this Collector over TLS-protected OTLP/HTTP using Azure
+Workload Identity.
 
-The Collector sends OTLP logs to VictoriaLogs and Azure Monitor metrics to
-VictoriaMetrics. Event Hubs logs continue to the debug exporter, which prints
-them to container output. The configured OTLP pipelines accept logs only;
-traces are not enabled.
+The Collector sends OTLP and Event Hubs logs to VictoriaLogs and OTLP/Azure
+Monitor metrics to VictoriaMetrics. Traces are not enabled.
 
 ## Data flow
 
 | Input | Collector configuration | Output |
 | --- | --- | --- |
-| AKS and Container Insights logs exported from Log Analytics | Azure Event Hubs receiver; raw JSON payloads are decoded and parsed | Debug exporter |
-| Managed AKS metrics | Azure Monitor receiver, queried every 60 seconds | VictoriaMetrics via Prometheus remote write |
+| AKS and Container Insights logs exported from Log Analytics | Azure Event Hubs receiver; raw JSON payloads are decoded and parsed | VictoriaLogs via OTLP/HTTP |
+| AKS node and pod metrics | Agent DaemonSet `kubeletstats` receiver; OTLP/HTTP on `4318`, protected by TLS and Entra ID OIDC token validation | VictoriaMetrics via Prometheus remote write |
+| Azure Monitor AKS platform metrics | Azure Monitor receiver, queried every 60 seconds | VictoriaMetrics via Prometheus remote write |
 | OTLP logs from AKS node agents and other clients | OTLP/gRPC on `4317` or OTLP/HTTP on `4318`, protected by TLS and Entra ID OIDC token validation | VictoriaLogs via OTLP/HTTP |
 
 The OTLP/gRPC receiver port (`4317`) and OTLP/HTTP receiver port (`4318`) are
@@ -28,9 +29,9 @@ published on the Docker host at the address set by `OTEL_GRPC_BIND_ADDRESS`,
 which defaults to loopback (`127.0.0.1`). The VictoriaMetrics API (`8428`),
 VictoriaLogs API (`9428`), and Grafana UI (`3000`) are also bound to host loopback
 only. The Collector health-check endpoint (`13133`) remains internal to the
-Compose network. To
-receive logs from AKS, bind the OTLP ports to the Docker host's LAN address,
-configure the temporary router NAT for TCP `4318`, restrict ingress to the AKS
+Compose network. To receive logs and metrics from AKS, bind the OTLP ports to
+the Docker host's LAN address, configure the temporary router NAT for TCP `4318`,
+restrict ingress to the AKS
 cluster's outbound public IP address(es), and use a server certificate whose
 SAN matches the HTTPS endpoint used by AKS. The Event Hubs receiver stores its
 consumer checkpoints under `data/otel-collector-checkpoints`. Event Hubs
@@ -108,16 +109,16 @@ The environment template already sets the Event Hubs consumer group to
 `/var/lib/otelcol/storage-v2`. The start script refreshes the Azure tenant,
 client credentials, subscription, resource group, Event Hubs connection string,
 and consumer group from OpenTofu outputs. Ensure the deployment has the
-`enable_azure_monitor_metrics` and `enable_event_hub` features enabled.
+`enable_azure_monitor_metrics = false` and `enable_otel_metrics_reader = true`
+settings to disable the AKS-managed metrics add-on while retaining the external
+Collector's Azure Monitor reader, and `enable_event_hub = true` for Event Hubs.
 
-Add `GRAFANA_ADMIN_USER` and `GRAFANA_ADMIN_PASSWORD` to the ignored `.env`
-before starting the stack. Choose your own admin username and a strong password;
-neither has a checked-in default. Use single-quoted values, for example
-`GRAFANA_ADMIN_USER='admin'`. Single quotes preserve literal `$`, `#`, spaces,
-and backslashes in both Bash and Compose; avoid embedded single quotes because
-the helper also sources this file as Bash. Keep `.env` mode `600` and never
-commit it. Missing or empty Grafana credentials cause `--start` to fail before
-the Azure setup script removes containers or checkpoints.
+Grafana allows anonymous access with the Admin role; its login form and basic
+authentication are disabled. This is intended only for local development. The
+UI is bound to `127.0.0.1:3000`; keep it loopback-only because anyone who can
+reach it has full Grafana administration access. The setup script removes the
+obsolete `GRAFANA_ADMIN_USER` and `GRAFANA_ADMIN_PASSWORD` entries from `.env`;
+no Grafana credentials are required.
 
 ## Start and stop with `otel.sh`
 
@@ -131,7 +132,8 @@ Start the entire stack from this directory:
 reads the required OpenTofu outputs, signs in to Azure CLI if needed, selects
 the deployment subscription, verifies the tenant, and updates the local AKS
 kubeconfig. It refreshes the Azure values in `.env` from those outputs while
-preserving Grafana settings, then stops and removes the existing Compose project
+preserving other local settings and removing obsolete Grafana credentials,
+then stops and removes the existing Compose project
 containers and clears and recreates the Event Hubs checkpoint directory. The
 script finally starts all four services: the Collector, VictoriaMetrics,
 VictoriaLogs, and Grafana.
@@ -141,9 +143,8 @@ checkpoint store can skip messages already waiting in the Event Hub, so do not
 use `--start` when you need to preserve the current consumer position. The
 start operation also removes other containers in this Compose project,
 including Grafana, VictoriaMetrics, and VictoriaLogs and their ephemeral
-data. All services are then started again. Grafana's admin account is initialized
-from `.env`, and its data sources are provisioned again; UI-created state is not
-restored.
+data. All services are then started again. Grafana's data sources are
+provisioned again; UI-created state is not restored.
 
 Follow Collector output with:
 
@@ -207,9 +208,10 @@ available from the Docker host on loopback only:
 
 ### Grafana
 
-Open `http://127.0.0.1:3000` and log in using `GRAFANA_ADMIN_USER` and
-`GRAFANA_ADMIN_PASSWORD` from `.env`. Anonymous access and user self-registration
-are disabled. Grafana runs OSS image `grafana/grafana:13.3.1`.
+Open `http://127.0.0.1:3000`; no login is required. Anonymous access is enabled,
+with the Admin role for local development. The login form, basic
+authentication, and user self-registration are disabled. Keep this UI bound to
+loopback; Grafana runs OSS image `grafana/grafana:13.3.1`.
 
 The read-only files in [`grafana/provisioning/datasources/`](grafana/provisioning/datasources/)
 automatically create these data sources at startup:
@@ -234,8 +236,8 @@ In **Explore**, choose **VictoriaMetrics** and run a PromQL query such as
 `count({__name__!=""})`, or choose **VictoriaLogs** and use LogsQL `*` to
 search logs in the selected time range. No dashboards or alerts are provisioned.
 
-Only the OTLP logs pipeline is sent to VictoriaLogs. Event Hubs logs remain on
-the debug exporter and appear in `docker compose logs otel-collector`.
+Both the OTLP and Event Hubs logs pipelines export to VictoriaLogs over
+OTLP/HTTP. Event Hubs records are decoded and parsed as JSON before export.
 
 To inspect runtime state or diagnose startup problems, use:
 
@@ -278,6 +280,6 @@ docker compose logs --tail=100 grafana
    TLS and Entra ID token validation remain enabled while the port is
    published.
 
-The debug exporter prints Event Hubs log records to Collector output. Review
-access controls and use durable storage before relying on this test stack for
-long-term retention.
+Event Hubs log records are exported to VictoriaLogs over the internal Compose
+network. Review access controls and configure durable storage before relying on
+this test stack for long-term retention.

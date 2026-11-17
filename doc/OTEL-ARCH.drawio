@@ -1,111 +1,171 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <mxfile host="drawio" version="26.0.0">
-  <diagram id="otel-architecture" name="OTEL Architecture">
-    <mxGraphModel dx="1700" dy="940" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="940" math="0" shadow="0">
+  <diagram id="otel-infrastructure" name="Infrastructure">
+    <mxGraphModel dx="1920" dy="1080" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-        <mxCell id="2" value="Multi-Tenant Azure Telemetry to Central Observability" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=24;fontStyle=1;fontColor=#1a1a1a;" vertex="1" parent="1">
-          <mxGeometry x="40" y="20" width="1400" height="50" as="geometry" />
+        <mxCell id="title" value="AKS Telemetry Infrastructure | Azure Subscription and Local Compose Stack" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=24;fontStyle=1;fontColor=#1a1a1a;" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="1800" height="45" as="geometry" />
         </mxCell>
-        <mxCell id="3" value="LOGS | AKS DaemonSet to external OTEL API" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=18;fontStyle=1;fontColor=#1a1a1a;" vertex="1" parent="1">
-          <mxGeometry x="40" y="95" width="1300" height="35" as="geometry" />
+        <mxCell id="subtitle" value="Infrastructure topology | AKS agent runs inside the cluster; external OTEL Collector and Grafana run on the local workstation" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=14;fontColor=#404040;" vertex="1" parent="1">
+          <mxGeometry x="40" y="70" width="1800" height="30" as="geometry" />
         </mxCell>
-        <mxCell id="4" value="AKS pod logs&#xa;Clusters across tenants&#xa;Container files /var/log/pods" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontFamily=Helvetica;fontSize=14;" vertex="1" parent="1">
-          <mxGeometry x="40" y="160" width="220" height="100" as="geometry" />
+        <mxCell id="azure-subscription" value="Azure Subscription (development)" style="rounded=0;whiteSpace=wrap;html=1;container=1;pointerEvents=0;fillColor=none;strokeColor=#0078d4;strokeWidth=2;dashed=1;dashPattern=8 4;verticalAlign=top;spacingTop=10;fontFamily=Helvetica;fontSize=17;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="1060" height="810" as="geometry" />
         </mxCell>
-        <mxCell id="5" value="OTEL Agent DaemonSet&#xa;file_log + k8s_attributes&#xa;LOGS ONLY" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontFamily=Helvetica;fontSize=14;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="330" y="150" width="260" height="120" as="geometry" />
+        <mxCell id="resource-group" value="Resource Group" style="rounded=0;whiteSpace=wrap;html=1;container=1;pointerEvents=0;fillColor=#f7fbff;strokeColor=#6c8ebf;strokeWidth=1;verticalAlign=top;spacingTop=8;fontFamily=Helvetica;fontSize=15;fontStyle=1;" vertex="1" parent="azure-subscription">
+          <mxGeometry x="20" y="50" width="1020" height="620" as="geometry" />
         </mxCell>
-        <mxCell id="6" value="External OTEL Collector API&#xa;OTLP/HTTP receiver :4318&#xa;https://otel.cg5labs.net:4318&#xa;TLS + OIDC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontFamily=Helvetica;fontSize=14;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="700" y="140" width="300" height="140" as="geometry" />
+        <mxCell id="aks-cluster" value="AKS Cluster" style="rounded=0;whiteSpace=wrap;html=1;container=1;pointerEvents=0;fillColor=#eaf3f8;strokeColor=#0078d4;strokeWidth=2;verticalAlign=top;spacingTop=8;fontFamily=Helvetica;fontSize=15;fontStyle=1;" vertex="1" parent="resource-group">
+          <mxGeometry x="20" y="50" width="610" height="560" as="geometry" />
         </mxCell>
-        <mxCell id="7" value="Logs pipeline&#xa;memory_limiter + batch&#xa;OTLP/HTTP exporter" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontFamily=Helvetica;fontSize=14;" vertex="1" parent="1">
-          <mxGeometry x="1090" y="150" width="240" height="120" as="geometry" />
+        <mxCell id="aks-control-plane" value="Managed AKS control plane | OIDC issuer + Workload Identity enabled" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontFamily=Helvetica;fontSize=12;fontStyle=1;" vertex="1" parent="aks-cluster">
+          <mxGeometry x="20" y="40" width="570" height="60" as="geometry" />
         </mxCell>
-        <mxCell id="8" value="VictoriaLogs&#xa;OTLP log storage" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontFamily=Helvetica;fontSize=14;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="1400" y="155" width="250" height="110" as="geometry" />
+        <mxCell id="aks-node-network" value="VNet / AKS node subnet" style="rounded=0;whiteSpace=wrap;html=1;container=1;pointerEvents=0;fillColor=#f5f9fc;strokeColor=#6c8ebf;strokeWidth=2;dashed=1;dashPattern=6 4;verticalAlign=top;spacingTop=8;fontFamily=Helvetica;fontSize=13;fontStyle=1;" vertex="1" parent="aks-cluster">
+          <mxGeometry x="20" y="120" width="570" height="360" as="geometry" />
         </mxCell>
-        <mxCell id="9" value="read pod log files" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#6c8ebf;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="4" target="5">
+        <mxCell id="aks-system-pool" value="System node pool&#xa;Azure Linux VM Scale Set" style="rounded=0;whiteSpace=wrap;html=1;container=1;pointerEvents=0;fillColor=#ffffff;strokeColor=#6c8ebf;verticalAlign=top;spacingTop=8;fontFamily=Helvetica;fontSize=12;fontStyle=1;" vertex="1" parent="aks-node-network">
+          <mxGeometry x="20" y="40" width="250" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="aks-spot-pool" value="Spot user node pool&#xa;Azure Linux VM Scale Set" style="rounded=0;whiteSpace=wrap;html=1;container=1;pointerEvents=0;fillColor=#ffffff;strokeColor=#6c8ebf;verticalAlign=top;spacingTop=8;fontFamily=Helvetica;fontSize=12;fontStyle=1;" vertex="1" parent="aks-node-network">
+          <mxGeometry x="290" y="40" width="260" height="250" as="geometry" />
+        </mxCell>
+        <mxCell id="otel-agent" value="OTEL Agent DaemonSet&#xa;file_log + kubeletstats&#xa;pod logs + node/pod metrics&#xa;Workload Identity" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontFamily=Helvetica;fontSize=12;fontStyle=1;" vertex="1" parent="aks-spot-pool">
+          <mxGeometry x="15" y="90" width="230" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="log-analytics" value="Log Analytics Workspace&#xa;Container Insights + AKS diagnostics" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontFamily=Helvetica;fontSize=12;" vertex="1" parent="resource-group">
+          <mxGeometry x="650" y="50" width="330" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="event-hub" value="Event Hubs&#xa;LAW continuous data export destination" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontFamily=Helvetica;fontSize=12;" vertex="1" parent="resource-group">
+          <mxGeometry x="650" y="170" width="330" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="container-registry" value="Azure Container Registry&#xa;Kubelet identity: AcrPull" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontFamily=Helvetica;fontSize=12;" vertex="1" parent="resource-group">
+          <mxGeometry x="650" y="260" width="330" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="agent-identity" value="User-assigned managed identity&#xa;Federated credential for otel-agent" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontFamily=Helvetica;fontSize=12;" vertex="1" parent="resource-group">
+          <mxGeometry x="650" y="400" width="330" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="azure-monitor-api" value="Azure Monitor API&#xa;Microsoft-managed service | subscription-scoped metrics" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontFamily=Helvetica;fontSize=12;" vertex="1" parent="azure-subscription">
+          <mxGeometry x="20" y="690" width="330" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="workstation" value="Local workstation / Docker host&#xa;Local development only" style="rounded=0;whiteSpace=wrap;html=1;container=1;pointerEvents=0;fillColor=#f5f5f5;strokeColor=#666666;strokeWidth=2;verticalAlign=top;spacingTop=10;fontFamily=Helvetica;fontSize=16;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1210" y="120" width="680" height="810" as="geometry" />
+        </mxCell>
+        <mxCell id="compose-stack" value="Docker Compose stack" style="rounded=0;whiteSpace=wrap;html=1;container=1;pointerEvents=0;fillColor=#ffffff;strokeColor=#999999;verticalAlign=top;spacingTop=8;fontFamily=Helvetica;fontSize=14;fontStyle=1;" vertex="1" parent="workstation">
+          <mxGeometry x="20" y="50" width="640" height="650" as="geometry" />
+        </mxCell>
+        <mxCell id="otel-collector" value="OTEL Collector&#xa;OTLP/HTTP :4318 | TLS + OIDC&#xa;azureeventhub + azuremonitor receivers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontFamily=Helvetica;fontSize=12;fontStyle=1;" vertex="1" parent="compose-stack">
+          <mxGeometry x="30" y="275" width="230" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="victoria-metrics" value="VictoriaMetrics&#xa;Prometheus remote write" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontFamily=Helvetica;fontSize=12;fontStyle=1;" vertex="1" parent="compose-stack">
+          <mxGeometry x="350" y="130" width="260" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="victoria-logs" value="VictoriaLogs&#xa;OTLP/HTTP log storage" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontFamily=Helvetica;fontSize=12;fontStyle=1;" vertex="1" parent="compose-stack">
+          <mxGeometry x="350" y="300" width="260" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="grafana" value="Grafana&#xa;127.0.0.1:3000 | anonymous Admin&#xa;Local only" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontFamily=Helvetica;fontSize=12;fontStyle=1;" vertex="1" parent="compose-stack">
+          <mxGeometry x="350" y="470" width="260" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-azure" value="" style="rounded=0;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="50" y="980" width="22" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-azure-label" value="Azure resource" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="80" y="978" width="120" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-collector" value="" style="rounded=0;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="220" y="980" width="22" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-collector-label" value="Collector" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="250" y="978" width="90" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-backend" value="" style="rounded=0;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="360" y="980" width="22" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-backend-label" value="Telemetry backend" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="390" y="978" width="140" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-grafana" value="" style="rounded=0;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="550" y="980" width="22" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-grafana-label" value="Grafana / identity" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="580" y="978" width="150" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-boundary" value="" style="rounded=0;html=1;fillColor=none;strokeColor=#0078d4;strokeWidth=2;dashed=1;dashPattern=8 4;" vertex="1" parent="1">
+          <mxGeometry x="750" y="980" width="32" height="18" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-boundary-label" value="Subscription / VNet perimeter boundary" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="790" y="978" width="260" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="legend-note" value="The dashed Azure Subscription and VNet / AKS subnet boxes show separate cloud-scope and network boundaries." style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;fontColor=#404040;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1015" width="1200" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="law-to-eventhub" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#6c8ebf;strokeWidth=2;" edge="1" parent="1" source="log-analytics" target="event-hub">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="875" y="320" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="identity-to-agent" value="Workload Identity" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=block;endFill=1;strokeColor=#9673a6;strokeWidth=2;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="agent-identity" target="otel-agent">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="680" y="615" />
+              <mxPoint x="680" y="600" />
+              <mxPoint x="520" y="600" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="agent-to-collector" value="OTLP/HTTP :4318 | pod logs + node/pod metrics | TLS + Entra OIDC" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#d79b00;strokeWidth=2;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="otel-agent" target="otel-collector">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-        <mxCell id="10" value="TLS OTLP/HTTP&#xa;Entra access token" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#d79b00;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="5" target="6">
-          <mxGeometry relative="1" as="geometry" />
+        <mxCell id="eventhub-to-collector" value="Exported logs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#d6b656;strokeWidth=2;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="event-hub" target="otel-collector">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1190" y="380" />
+              <mxPoint x="1190" y="520" />
+            </Array>
+          </mxGeometry>
         </mxCell>
-        <mxCell id="11" value="OIDC-validated logs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#6c8ebf;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="6" target="7">
-          <mxGeometry relative="1" as="geometry" />
+        <mxCell id="collector-to-azuremonitor" value="Azure Monitor metrics query" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#666666;strokeWidth=2;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="otel-collector" target="azure-monitor-api">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1375" y="900" />
+              <mxPoint x="390" y="900" />
+            </Array>
+          </mxGeometry>
         </mxCell>
-        <mxCell id="12" value="OTLP/HTTP" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#6c8ebf;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="7" target="8">
-          <mxGeometry relative="1" as="geometry" />
+        <mxCell id="collector-to-victoriametrics" value="Prometheus remote write" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#82b366;strokeWidth=2;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="otel-collector" target="victoria-metrics">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1530" y="480" />
+              <mxPoint x="1530" y="360" />
+            </Array>
+          </mxGeometry>
         </mxCell>
-        <mxCell id="13" value="METRICS | Collected independently by the external Collector" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=18;fontStyle=1;fontColor=#1a1a1a;" vertex="1" parent="1">
-          <mxGeometry x="40" y="335" width="1500" height="35" as="geometry" />
+        <mxCell id="collector-to-victorialogs" value="OTLP/HTTP logs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#82b366;strokeWidth=2;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="otel-collector" target="victoria-logs">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1530" y="550" />
+            </Array>
+          </mxGeometry>
         </mxCell>
-        <mxCell id="14" value="Azure Monitor APIs&#xa;AKS metrics across subscriptions" style="rounded=1;dashed=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontFamily=Helvetica;fontSize=14;" vertex="1" parent="1">
-          <mxGeometry x="40" y="410" width="220" height="100" as="geometry" />
+        <mxCell id="grafana-to-victorialogs" value="Provisioned data source" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#9673a6;strokeWidth=1;fontFamily=Helvetica;fontSize=10;labelBackgroundColor=#ffffff;exitX=0.5;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="grafana" target="victoria-logs">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1710" y="620" />
+              <mxPoint x="1710" y="580" />
+            </Array>
+          </mxGeometry>
         </mxCell>
-        <mxCell id="15" value="External Collector&#xa;azuremonitor receiver&#xa;Tenant SPN | 60-second interval" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontFamily=Helvetica;fontSize=14;" vertex="1" parent="1">
-          <mxGeometry x="450" y="400" width="260" height="120" as="geometry" />
-        </mxCell>
-        <mxCell id="16" value="Metrics pipeline&#xa;Prometheus remote write" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontFamily=Helvetica;fontSize=14;" vertex="1" parent="1">
-          <mxGeometry x="850" y="400" width="250" height="120" as="geometry" />
-        </mxCell>
-        <mxCell id="17" value="VictoriaMetrics&#xa;Prometheus remote write" style="shape=cylinder3;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontFamily=Helvetica;fontSize=14;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="1400" y="405" width="250" height="110" as="geometry" />
-        </mxCell>
-        <mxCell id="18" value="metrics query" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#666666;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="14" target="15">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="19" value="collected metrics" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#d79b00;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="15" target="16">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="20" value="remote write" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#6c8ebf;fontFamily=Helvetica;fontSize=12;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="16" target="17">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="21" value="AUTHENTICATION AND AUTHORIZATION" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=18;fontStyle=1;fontColor=#1a1a1a;" vertex="1" parent="1">
-          <mxGeometry x="40" y="575" width="1500" height="35" as="geometry" />
-        </mxCell>
-        <mxCell id="22" value="Per-cluster AKS Workload Identity&#xa;Tenant-local UAMI&#xa;Federated to service account&#xa;No client secret in pod" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontFamily=Helvetica;fontSize=13;" vertex="1" parent="1">
-          <mxGeometry x="40" y="640" width="350" height="120" as="geometry" />
-        </mxCell>
-        <mxCell id="23" value="Microsoft Entra ID&#xa;Per-tenant API trust and consent&#xa;Telemetry.Write role assignment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontFamily=Helvetica;fontSize=13;" vertex="1" parent="1">
-          <mxGeometry x="500" y="640" width="390" height="120" as="geometry" />
-        </mxCell>
-        <mxCell id="24" value="Remote OTLP receiver&#xa;TLS trusts the agent CA&#xa;OIDC validates issuer + audience" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontFamily=Helvetica;fontSize=13;" vertex="1" parent="1">
-          <mxGeometry x="1000" y="640" width="330" height="120" as="geometry" />
-        </mxCell>
-        <mxCell id="25" value="External Collector SPN&#xa;Tenant-specific credential&#xa;RBAC across selected subscriptions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontFamily=Helvetica;fontSize=13;" vertex="1" parent="1">
-          <mxGeometry x="1400" y="640" width="250" height="120" as="geometry" />
-        </mxCell>
-        <mxCell id="26" value="federated token exchange" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=block;endFill=1;strokeColor=#9673a6;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="22" target="23">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="27" value="OIDC trust: issuer + audience" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=block;endFill=1;strokeColor=#9673a6;fontFamily=Helvetica;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="23" target="24">
-          <mxGeometry relative="1" as="geometry" />
-        </mxCell>
-        <mxCell id="28" value="Illustrated flow is a single-tenant baseline; multi-tenant onboarding requires explicit issuer/audience trust, API role assignments, and per-subscription metric RBAC." style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontColor=#404040;" vertex="1" parent="1">
-          <mxGeometry x="40" y="800" width="1610" height="35" as="geometry" />
-        </mxCell>
-        <mxCell id="29" value="Legend" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=12;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="40" y="850" width="100" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="30" value="" style="rounded=0;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
-          <mxGeometry x="55" y="882" width="20" height="16" as="geometry" />
-        </mxCell>
-        <mxCell id="31" value="Collector component" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="82" y="880" width="130" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="32" value="" style="rounded=0;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
-          <mxGeometry x="225" y="882" width="20" height="16" as="geometry" />
-        </mxCell>
-        <mxCell id="33" value="Backend" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="252" y="880" width="80" height="20" as="geometry" />
-        </mxCell>
-        <mxCell id="34" value="" style="rounded=0;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
-          <mxGeometry x="345" y="882" width="20" height="16" as="geometry" />
-        </mxCell>
-        <mxCell id="35" value="Identity / trust" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Helvetica;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="372" y="880" width="120" height="20" as="geometry" />
+        <mxCell id="grafana-to-victoriametrics" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;strokeColor=#9673a6;strokeWidth=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="grafana" target="victoria-metrics">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1860" y="700" />
+              <mxPoint x="1860" y="360" />
+            </Array>
+          </mxGeometry>
         </mxCell>
       </root>
     </mxGraphModel>
