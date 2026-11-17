@@ -14,8 +14,10 @@ logs/
 # Terraform
 *.tfplan
 *.tfstate
+*.tfstate.*
+terraform.tfstate.d/
+.terraform/
 *.hcl
-.terraform
 
 # Misc
 *.backup
