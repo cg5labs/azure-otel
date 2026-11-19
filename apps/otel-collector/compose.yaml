@@ -28,8 +28,14 @@ services:
       GF_PLUGINS_PREINSTALL_SYNC: victoriametrics-logs-datasource@0.34.0
     volumes:
       - type: bind
-        source: ./grafana/provisioning/datasources
-        target: /etc/grafana/provisioning/datasources
+        source: ./grafana/provisioning
+        target: /etc/grafana/provisioning
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./grafana/dashboards
+        target: /var/lib/grafana/dashboards
         read_only: true
         bind:
           create_host_path: false

@@ -11,6 +11,8 @@ command:
   name: otelcol-contrib
 
 presets:
+  clusterMetrics:
+    enabled: true
   kubeletMetrics:
     enabled: true
   kubernetesAttributes:
@@ -49,6 +51,18 @@ config:
             - replace_pattern(metric.name, "\\.", "_")
             - replace_pattern(metric.name, "$", "_bytes") where metric.unit == "By" and not IsMatch(metric.name, "_bytes$")
   receivers:
+    kubeletstats:
+      collection_interval: 30s
+      auth_type: serviceAccount
+      endpoint: "${env:K8S_NODE_NAME}:10250"
+      # Prefer certificate verification. Configure the CA and server name
+      # to match your AKS kubelet certificate setup.
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      metric_groups:
+        - node
+        - pod
+        - container
+
     file_log:
       include:
         - /var/log/pods/*/*/*.log
