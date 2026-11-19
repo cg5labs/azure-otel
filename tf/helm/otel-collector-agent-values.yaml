@@ -11,6 +11,8 @@ command:
   name: otelcol-contrib
 
 presets:
+  clusterMetrics:
+    enabled: true
   kubeletMetrics:
     enabled: true
   kubernetesAttributes:
@@ -106,7 +108,7 @@ config:
           - batch
         receivers:
           - kubeletstats
-          - prometheufalses
+          - prometheus
       traces: null
     telemetry:
       metrics:
