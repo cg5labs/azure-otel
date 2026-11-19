@@ -40,7 +40,7 @@ an `otel-agent` Collector DaemonSet on eligible AKS user nodes:
                                                        └─> VictoriaLogs
 ```
 
-[![AKS infrastructure, subscription and VNet boundaries, and local OTEL stack](doc/OTEL-ARCH.png)](doc/OTEL-ARCH.md)
+[![AKS infrastructure, subscription and VNet boundaries, and local OTEL stack](doc/aks-otel-flow-2.png)](doc/OTEL-ARCH.md)
 
 **AKS node-local collection:** The
 [`otel-agent` Helm release](tf/helm/otel-collector-agent-values.yaml) runs as
