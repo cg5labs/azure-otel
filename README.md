@@ -18,9 +18,9 @@ an `otel-agent` Collector DaemonSet on eligible AKS user nodes:
 ```text
  AKS nodes and pods
    ├─ container logs (/var/log/pods) ───┐
-   └─ node/pod metrics (local kubelet) ─┤
+   └─ node/pod/object metrics (kubelet + node-exporter + KSM) ─┤
                                         v
-                    [otel-agent DaemonSet: file_log + kubeletstats]
+        [otel-agent DaemonSet: file_log + kubeletstats + prometheus]
                               k8s_attributes processor
                                         │
                    OTLP/HTTP + TLS + AKS Workload Identity
@@ -40,14 +40,22 @@ an `otel-agent` Collector DaemonSet on eligible AKS user nodes:
                                                        └─> VictoriaLogs
 ```
 
-[![AKS infrastructure, subscription and VNet boundaries, and local OTEL stack](doc/aks-otel-flow.png)](doc/OTEL-ARCH.md)
+[![AKS infrastructure, subscription and VNet boundaries, and local OTEL stack](doc/OTEL-ARCH.png)](doc/OTEL-ARCH.md)
 
 **AKS node-local collection:** The
 [`otel-agent` Helm release](tf/helm/otel-collector-agent-values.yaml) runs as
 a DaemonSet on eligible user nodes. Its `file_log` receiver tails pod
 container logs from `/var/log/pods`; its `kubeletstats` receiver polls the
-local kubelet for node and pod metrics. The `k8s_attributes` processor
-enriches both signals. The agent exports both pipelines as OTLP/HTTP to
+local kubelet for node and pod metrics. Its Prometheus receiver scrapes the
+node-exporter DaemonSet through the headless
+`node-exporter.otel-agent.svc.cluster.local` Service every 30 seconds. DNS
+discovery supplies each exporter pod IP as a scrape target. A pinned
+`kube-state-metrics` Deployment in the same namespace exposes Kubernetes object
+metrics through its Service, which the agent also scrapes every 30 seconds.
+Both DaemonSets use pod networking. A transform processor converts dotted
+metric names to underscores and appends `_bytes` to metrics with unit `By`.
+The `k8s_attributes` processor enriches both signals. The agent exports both
+pipelines as OTLP/HTTP to
 `https://otel.cg5labs.net:4318`. AKS Workload Identity supplies the Entra
 token, and the mounted CA verifies the external Collector's TLS certificate.
 The chart preset grants the agent `nodes/stats` access for kubelet metrics.
@@ -156,10 +164,12 @@ OTEL_AGENT_CA_FILE=/path/to/collector-ca.crt \
 
 The helper reads the agent identity and OTLP scope from OpenTofu outputs,
 configures AKS Workload Identity, creates the CA Secret, and installs the
-Helm chart. The endpoint must be reachable from AKS and its certificate must
+OTEL agent, node-exporter, and kube-state-metrics Helm charts in the
+`otel-agent` namespace. The endpoint must be reachable from AKS and its certificate must
 match the endpoint hostname. The agent values and deployment helper are
 [`tf/helm/otel-collector-agent-values.yaml`](tf/helm/otel-collector-agent-values.yaml)
-and [`tf/scripts/otel-agent.sh`](tf/scripts/otel-agent.sh).
+and [`tf/scripts/otel-agent.sh`](tf/scripts/otel-agent.sh); the node-exporter
+chart values are in [`tf/helm/node-exporter-values.yaml`](tf/helm/node-exporter-values.yaml).
 
 The workspace uses the `PerGB2018` pay-as-you-go SKU, 30-day retention, and a
 1 GiB daily ingestion quota by default. Resource-level workspace access,

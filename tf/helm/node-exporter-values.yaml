@@ -1,0 +1,11 @@
+fullnameOverride: node-exporter
+hostNetwork: false
+prometheusScrape: false
+
+service:
+  enabled: true
+  type: ClusterIP
+  clusterIP: None
+
+nodeSelector:
+  kubernetes.azure.com/mode: user

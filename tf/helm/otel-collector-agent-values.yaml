@@ -1,5 +1,7 @@
 fullnameOverride: otel
 mode: daemonset
+hostNetwork: false
+dnsPolicy: ClusterFirst
 
 image:
   repository: otel/opentelemetry-collector-contrib
@@ -30,6 +32,8 @@ config:
         # cert_file: /etc/otel/certs/client.crt
         # key_file: /etc/otel/certs/client.key
   extensions:
+    health_check:
+      endpoint: ${env:MY_POD_IP}:13133
     azure_auth:
       workload_identity:
         client_id: ${env:AZURE_CLIENT_ID}
@@ -37,6 +41,13 @@ config:
         tenant_id: ${env:AZURE_TENANT_ID}
       scopes:
         - ${env:OTEL_AGENT_OTLP_SCOPE}
+  processors:
+    transform/prometheus_names:
+      metric_statements:
+        - context: metric
+          statements:
+            - replace_pattern(metric.name, "\\.", "_")
+            - replace_pattern(metric.name, "$", "_bytes") where metric.unit == "By" and not IsMatch(metric.name, "_bytes$")
   receivers:
     file_log:
       include:
@@ -55,7 +66,26 @@ config:
           max_log_size: 102400
     jaeger: null
     otlp: null
-    prometheus: null
+    prometheus:
+      config:
+        scrape_configs:
+          - job_name: node-exporter
+            scrape_interval: 30s
+            metrics_path: /metrics
+            scheme: http
+            dns_sd_configs:
+              - names:
+                  - node-exporter.otel-agent.svc.cluster.local
+                type: A
+                port: 9100
+                refresh_interval: 30s
+          - job_name: kube-state-metrics
+            scrape_interval: 30s
+            metrics_path: /metrics
+            scheme: http
+            static_configs:
+              - targets:
+                  - kube-state-metrics.otel-agent.svc.cluster.local:8080
     zipkin: null
   service:
     extensions:
@@ -72,9 +102,11 @@ config:
           - otlp_http
         processors:
           - memory_limiter
+          - transform/prometheus_names
           - batch
         receivers:
           - kubeletstats
+          - prometheufalses
       traces: null
     telemetry:
       metrics:

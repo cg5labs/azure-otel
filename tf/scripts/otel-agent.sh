@@ -16,9 +16,17 @@ readonly HELM_CHART_NAME="opentelemetry-collector"
 readonly HELM_RELEASE_NAME="otel-agent"
 readonly KUBERNETES_NAMESPACE="otel-agent"
 readonly KUBERNETES_SECRET_NAME="otel-agent-mtls"
+readonly PROMETHEUS_COMMUNITY_HELM_REPOSITORY="https://prometheus-community.github.io/helm-charts"
+readonly NODE_EXPORTER_HELM_CHART_VERSION="5.1.0"
+readonly NODE_EXPORTER_HELM_CHART_NAME="prometheus-node-exporter"
+readonly NODE_EXPORTER_HELM_RELEASE_NAME="node-exporter"
+readonly KUBE_STATE_METRICS_HELM_CHART_VERSION="9.0.1"
+readonly KUBE_STATE_METRICS_HELM_CHART_NAME="kube-state-metrics"
+readonly KUBE_STATE_METRICS_HELM_RELEASE_NAME="kube-state-metrics"
 
 PROJECT_DIR=""
 VALUES_FILE=""
+NODE_EXPORTER_VALUES_FILE=""
 KUBECONFIG_DIR=""
 KUBECONFIG_FILE=""
 
@@ -29,8 +37,9 @@ Usage: OTEL_AGENT_OTLP_ENDPOINT=https://host:4318 \
   ./scripts/otel-agent.sh
 
 Deploys or upgrades the OpenTelemetry Collector DaemonSet on the AKS cluster
-described by the OpenTofu state in this directory. Uses AKS Workload Identity
-to authenticate OTLP exports to the external Collector.
+described by the OpenTofu state in this directory. Also deploys node-exporter
+and kube-state-metrics in the same namespace. Uses AKS Workload Identity to
+authenticate OTLP exports to the external Collector.
 EOF
 }
 
@@ -73,9 +82,14 @@ resolve_project_paths() {
   script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
   PROJECT_DIR="$(cd -- "$script_dir/.." && pwd)"
   VALUES_FILE="$PROJECT_DIR/helm/otel-collector-agent-values.yaml"
+  NODE_EXPORTER_VALUES_FILE="$PROJECT_DIR/helm/node-exporter-values.yaml"
 
   if [[ ! -f "$VALUES_FILE" ]]; then
     printf 'Helm values file not found: %s\n' "$VALUES_FILE" >&2
+    exit 1
+  fi
+  if [[ ! -f "$NODE_EXPORTER_VALUES_FILE" ]]; then
+    printf 'Node Exporter Helm values file not found: %s\n' "$NODE_EXPORTER_VALUES_FILE" >&2
     exit 1
   fi
 }
@@ -97,6 +111,36 @@ authenticate_azure() {
     printf 'No active Azure CLI session. Starting az login...\n' >&2
     az login --output none
   fi
+}
+
+deploy_node_exporter() {
+  helm upgrade --install "$NODE_EXPORTER_HELM_RELEASE_NAME" "$NODE_EXPORTER_HELM_CHART_NAME" \
+    --repo "$PROMETHEUS_COMMUNITY_HELM_REPOSITORY" \
+    --version "$NODE_EXPORTER_HELM_CHART_VERSION" \
+    --namespace "$KUBERNETES_NAMESPACE" \
+    --kubeconfig "$KUBECONFIG_FILE" \
+    --values "$NODE_EXPORTER_VALUES_FILE" \
+    --debug
+
+  kubectl --kubeconfig "$KUBECONFIG_FILE" \
+    --namespace "$KUBERNETES_NAMESPACE" \
+    rollout status "daemonset/$NODE_EXPORTER_HELM_RELEASE_NAME" \
+    --timeout=5m
+}
+
+deploy_kube_state_metrics() {
+  helm upgrade --install "$KUBE_STATE_METRICS_HELM_RELEASE_NAME" "$KUBE_STATE_METRICS_HELM_CHART_NAME" \
+    --repo "$PROMETHEUS_COMMUNITY_HELM_REPOSITORY" \
+    --version "$KUBE_STATE_METRICS_HELM_CHART_VERSION" \
+    --namespace "$KUBERNETES_NAMESPACE" \
+    --create-namespace \
+    --kubeconfig "$KUBECONFIG_FILE" \
+    --debug
+
+  kubectl --kubeconfig "$KUBECONFIG_FILE" \
+    --namespace "$KUBERNETES_NAMESPACE" \
+    rollout status "deployment/$KUBE_STATE_METRICS_HELM_RELEASE_NAME" \
+    --timeout=5m
 }
 
 cleanup() {
@@ -169,6 +213,9 @@ main() {
       --force-conflicts \
       --field-manager=otel-agent \
       --filename=-
+
+  deploy_node_exporter
+  deploy_kube_state_metrics
 
   helm upgrade --install "$HELM_RELEASE_NAME" "$HELM_CHART_NAME" \
     --repo "$HELM_REPOSITORY" \

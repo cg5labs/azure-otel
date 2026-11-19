@@ -33,6 +33,12 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      - type: bind
+        source: ./grafana/provisioning/dashboards
+        target: /etc/grafana/provisioning/dashboards
+        read_only: true
+        bind:
+          create_host_path: false
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:

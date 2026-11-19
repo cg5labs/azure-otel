@@ -8,9 +8,13 @@ authentication.
 Client-certificate authentication is disabled. Azure infrastructure is provisioned
 separately with OpenTofu; see the
 [Azure foundation README](../../terraform/otel-azure/README.md). The AKS
-node-local Collector agent is deployed separately with Helm and sends pod logs
-and node/pod metrics to this Collector over TLS-protected OTLP/HTTP using Azure
-Workload Identity.
+node-local Collector agent and Prometheus Node Exporter are deployed separately
+with Helm. The agent sends pod logs, kubelet node/pod metrics, node-exporter
+host metrics, and kube-state-metrics object metrics to this Collector over
+TLS-protected OTLP/HTTP using Azure Workload Identity. The agent normalizes
+dotted metric names to underscores and appends `_bytes` for metrics with unit
+`By` before export. The remote-write exporter applies the remaining Prometheus
+unit and counter suffixes.
 
 The Collector sends OTLP and Event Hubs logs to VictoriaLogs and OTLP/Azure
 Monitor metrics to VictoriaMetrics. Traces are not enabled.
@@ -20,7 +24,7 @@ Monitor metrics to VictoriaMetrics. Traces are not enabled.
 | Input | Collector configuration | Output |
 | --- | --- | --- |
 | AKS and Container Insights logs exported from Log Analytics | Azure Event Hubs receiver; raw JSON payloads are decoded and parsed | VictoriaLogs via OTLP/HTTP |
-| AKS node and pod metrics | Agent DaemonSet `kubeletstats` receiver; OTLP/HTTP on `4318`, protected by TLS and Entra ID OIDC token validation | VictoriaMetrics via Prometheus remote write |
+| AKS node, pod, host, and Kubernetes object metrics | Agent DaemonSet `kubeletstats` receiver plus Prometheus DNS discovery of node-exporter pod IPs through the headless `node-exporter.otel-agent.svc.cluster.local` Service and scrape of kube-state-metrics at `kube-state-metrics.otel-agent.svc.cluster.local:8080`, every 30 seconds; OTLP/HTTP on `4318`, protected by TLS and Entra ID OIDC token validation | VictoriaMetrics via Prometheus remote write |
 | Azure Monitor AKS platform metrics | Azure Monitor receiver, queried every 60 seconds | VictoriaMetrics via Prometheus remote write |
 | OTLP logs from AKS node agents and other clients | OTLP/gRPC on `4317` or OTLP/HTTP on `4318`, protected by TLS and Entra ID OIDC token validation | VictoriaLogs via OTLP/HTTP |
 
@@ -42,8 +46,8 @@ VictoriaMetrics and VictoriaLogs each use seven-day retention and ephemeral
 container storage. Their data is lost whenever their containers are removed
 or recreated; retention does not protect data across container replacement.
 Grafana also uses ephemeral storage: users, preferences, and UI-created dashboards
-are lost on container removal or recreation. Its provisioned data sources are
-recreated automatically.
+are lost on container removal or recreation. Its provisioned data sources and
+the dashboard stored as code are recreated automatically.
 
 ## Prerequisites
 
@@ -226,6 +230,12 @@ backends server-side. Data sources have stable UIDs (`victoria-metrics` and
 `victoria-logs`) and cannot be edited in the UI. Change their YAML definitions
 and restart Grafana to apply connection changes.
 
+The `Kubernetes / Views / Global` dashboard is stored in
+[`grafana/provisioning/dashboards/k8s-views-global-aks.json`](grafana/provisioning/dashboards/k8s-views-global-aks.json).
+The dashboard provider in `grafana/provisioning/dashboards/provider.yaml`
+loads it automatically at Grafana startup. Both the provider and dashboard are
+mounted read-only, and UI edits are disabled for the provisioned dashboard.
+
 The VictoriaLogs plugin is pinned to `0.34.0` to retain compatibility with the
 existing VictoriaLogs `v1.53.0`. It installs synchronously before data-source
 provisioning. Plugin download failures are visible in Grafana's container logs;
@@ -234,7 +244,7 @@ persisted. Recheck backend compatibility before upgrading the plugin.
 
 In **Explore**, choose **VictoriaMetrics** and run a PromQL query such as
 `count({__name__!=""})`, or choose **VictoriaLogs** and use LogsQL `*` to
-search logs in the selected time range. No dashboards or alerts are provisioned.
+search logs in the selected time range. No alerts are provisioned.
 
 Both the OTLP and Event Hubs logs pipelines export to VictoriaLogs over
 OTLP/HTTP. Event Hubs records are decoded and parsed as JSON before export.
