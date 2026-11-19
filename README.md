@@ -18,9 +18,9 @@ an `otel-agent` Collector DaemonSet on eligible AKS user nodes:
 ```text
  AKS nodes and pods
    ├─ container logs (/var/log/pods) ───┐
-   └─ node/pod/object metrics (kubelet + node-exporter + KSM) ─┤
+   └─ node/pod/object metrics (kubelet + k8s_cluster + Prometheus scrapes) ─┤
                                         v
-        [otel-agent DaemonSet: file_log + kubeletstats + prometheus]
+    [otel-agent DaemonSet: file_log + kubeletstats + prometheus + k8s_cluster]
                               k8s_attributes processor
                                         │
                    OTLP/HTTP + TLS + AKS Workload Identity
@@ -40,7 +40,7 @@ an `otel-agent` Collector DaemonSet on eligible AKS user nodes:
                                                        └─> VictoriaLogs
 ```
 
-[![AKS infrastructure, subscription and VNet boundaries, and local OTEL stack](doc/OTEL-ARCH.png)](doc/OTEL-ARCH.md)
+[![AKS infrastructure, subscription and VNet boundaries, and local OTEL stack](doc/aks-otel-flow-2.png)](doc/OTEL-ARCH.md)
 
 **AKS node-local collection:** The
 [`otel-agent` Helm release](tf/helm/otel-collector-agent-values.yaml) runs as
@@ -54,11 +54,15 @@ discovery supplies each exporter pod IP as a scrape target. A pinned
 metrics through its Service, which the agent also scrapes every 30 seconds.
 Both DaemonSets use pod networking. A transform processor converts dotted
 metric names to underscores and appends `_bytes` to metrics with unit `By`.
-The `k8s_attributes` processor enriches both signals. The agent exports both
-pipelines as OTLP/HTTP to
+The `k8s_cluster` receiver collects cluster-level metrics from the Kubernetes
+API. The chart's `clusterMetrics` preset adds the required RBAC and leader
+election so only one DaemonSet replica collects cluster metrics at a time.
+The `k8s_attributes` processor enriches collected telemetry. The agent exports
+both pipelines as OTLP/HTTP to
 `https://otel.cg5labs.net:4318`. AKS Workload Identity supplies the Entra
 token, and the mounted CA verifies the external Collector's TLS certificate.
-The chart preset grants the agent `nodes/stats` access for kubelet metrics.
+The `kubeletMetrics` preset grants the agent `nodes/stats` access, while
+`clusterMetrics` grants cluster-level read access and configures leader election.
 
 **External Collector:** The OTLP receiver validates the Entra token with OIDC.
 Its logs pipeline forwards OTLP logs to VictoriaLogs; its metrics pipeline
